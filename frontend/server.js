@@ -1,7 +1,7 @@
-consconst express = require('express');
+const express = require('express');
 const { spawn } = require('child_process');
 const path = require('path');
-const httpProxy = require('http-proxy'); // Note: requires 'http-proxy' in package.json
+const httpProxy = require('http-proxy');
 require('dotenv').config();
 
 const app = express();
@@ -18,7 +18,7 @@ app.get('/health', (req, res) => {
 });
 
 // 2. Proxy API and Auth requests to FastAPI running on port 8001
-app.all(['/api/*', '/auth/*'], (req, res) => {
+app.all(['/api*', '/auth*'], (req, res) => {
   proxy.web(req, res, { target: `http://127.0.0.1:${PYTHON_PORT}` }, (err) => {
     res.status(502).json({ error: 'Backend protocol service unavailable.' });
   });
@@ -27,12 +27,12 @@ app.all(['/api/*', '/auth/*'], (req, res) => {
 // 3. Serve static frontend files
 app.use(express.static(path.join(__dirname)));
 
-// 4. Fallback to index.html for frontend single-page routing (EXCLUDES api/auth)
+// 4. Fallback to index.html for frontend single-page routing
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Spawn Python FastAPI child process
+// Spawn Python FastAPI child process safely
 const pythonProcess = spawn('uvicorn', ['main:app', '--host', '127.0.0.1', '--port', PYTHON_PORT.toString()], {
   stdio: 'inherit',
   shell: true

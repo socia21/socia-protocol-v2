@@ -1,19 +1,21 @@
-Python
 import os
 import random
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from sqlmodel import Field, SQLModel, Session, create_engine, select
 
-# Environment Variables from Railway Configuration
+# Environment Variables or Direct Fallbacks for Outlook Credentials
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./socia_database.db")
-EMAIL_USER = os.getenv("EMAIL_USER", "secure-dispatcher@socia.protocol")
-EMAIL_PASS = os.getenv("EMAIL_PASS", "mock-smtp-password")
+EMAIL_USER = os.getenv("EMAIL_USER", "socia2121@outlook.com")
+EMAIL_PASS = os.getenv("EMAIL_PASS", "riaanisriaan21")
 
-# Fix Postgres URL dialect for SQLModel/SQLAlchemy async/sync compatibility if needed
+# Fix Postgres URL dialect for SQLModel/SQLAlchemy compatibility if needed
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
@@ -71,6 +73,39 @@ def get_session():
     with Session(engine) as session:
         yield session
 
+# --- HELPER: REAL OUTLOOK SMTP EMAIL DISPATCHER ---
+def send_otp_email(recipient_email: str, otp_code: str):
+    smtp_server = "smtp-mail.outlook.com"
+    smtp_port = 587
+    
+    message = MIMEMultipart("alternative")
+    message["Subject"] = "Your SOCIA Protocol Verification Code"
+    message["From"] = EMAIL_USER
+    message["To"] = recipient_email
+    
+    text = f"Welcome to SOCIA Protocol.\n\nYour account verification code is: {otp_code}\n\nPlease enter this code to activate your institutional profile."
+    html = f"""
+    <div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+        <h2 style="color: #38bdf8;">SOCIA Protocol Authentication</h2>
+        <p>Your secure verification code is:</p>
+        <div style="font-size: 32px; font-weight: bold; background: #1e293b; color: #38bdf8; padding: 12px 24px; display: inline-block; border-radius: 6px; letter-spacing: 4px;">{otp_code}</div>
+        <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">If you did not request this verification, please ignore this transmission.</p>
+    </div>
+    """
+    
+    message.attach(MIMEText(text, "plain"))
+    message.attach(MIMEText(html, "html"))
+    
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(EMAIL_USER, EMAIL_PASS)
+            server.sendmail(EMAIL_USER, recipient_email, message.as_string())
+        print(f"[SMTP SUCCESS] OTP email successfully sent to {recipient_email}")
+    except Exception as e:
+        print(f"[SMTP ERROR] Failed to send email via Outlook: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to dispatch verification email: {str(e)}")
+
 # --- SCHEMAS ---
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -108,12 +143,12 @@ def register_user(payload: RegisterRequest, session: Session = Depends(get_sessi
     
     generated_otp = str(random.randint(100000, 999999))
     
-    # In production, dispatch email utilizing EMAIL_USER and EMAIL_PASS here via SMTP/SendGrid
-    print(f"[SMTP DISPATCH MOCK] Sending OTP {generated_otp} to {payload.email} using account {EMAIL_USER}")
+    # Trigger actual Outlook email sending
+    send_otp_email(payload.email, generated_otp)
 
     user = UserAccount(
         email=payload.email,
-        hashed_password=payload.password, # Note: Hash securely in production apps
+        hashed_password=payload.password,
         role=payload.role,
         display_name=payload.display_name,
         handle=payload.handle,
@@ -126,8 +161,7 @@ def register_user(payload: RegisterRequest, session: Session = Depends(get_sessi
     
     return {
         "status": "pending_verification",
-        "message": f"OTP verification code dispatched to {payload.email}.",
-        "debug_otp_hint": generated_otp
+        "message": f"OTP verification code successfully dispatched via Outlook to {payload.email}."
     }
 
 @app.post("/auth/verify-otp")
