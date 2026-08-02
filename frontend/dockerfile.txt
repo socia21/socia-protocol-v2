@@ -1,0 +1,24 @@
+FROM python:3.10-slim
+
+# Install Node.js
+RUN apt-get update && apt-get install -y curl && \
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs
+
+WORKDIR /app
+
+# Copy dependency definitions and install packages
+COPY package*.json ./
+RUN npm install
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of your application code
+COPY . .
+
+ENV PORT=8000
+EXPOSE 8000
+
+# Start your application
+CMD ["npm", "start"]
