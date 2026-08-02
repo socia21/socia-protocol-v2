@@ -2,11 +2,10 @@
   "name": "socia-frontend",
   "version": "1.0.0",
   "description": "SOCIA Protocol Frontend",
-  "main": "index.html",
+  "main": "server.js",
   "scripts": {
-    "start": "npx serve -s . -l $PORT"
+    "start": "node server.js"
   },
-  dependencies": {
-    "serve": "^14.2.4"
+  "dependencies": {
+    "express": "^4.19.2"
   }
-}
