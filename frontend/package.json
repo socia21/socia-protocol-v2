@@ -1,15 +1,18 @@
 {
-  "name": "socia-frontend",
+  "name": "socia-protocol-backend",
   "version": "1.0.0",
-  "description": "SOCIA Protocol Frontend",
+  "description": "Institutional Escrow & Sovereign Matchmaking Protocol Backend",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "python:start": "uvicorn main:app --host 0.0.0.0 --port $PORT"
   },
   "dependencies": {
     "express": "^4.19.2",
-    "pg": "^8.11.3",
-    "bcryptjs": "^2.4.3",
-    "nodemailer": "^6.9.9"
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18.x",
+    "npm": ">=9.x"
   }
 }
