@@ -126,3 +126,15 @@ def get_deal_history():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+
+# --- KEEP ALL YOUR EXISTING CODE ABOVE THIS LINE ---
+
+import os
+import uvicorn
+
+if __name__ == "__main__":
+  # This grabs Railway's port automatically, or defaults to 8000 if you test locally
+  port = int(os.environ.get("PORT", 8000))
+
+  # This binds to "::" to fix the Railway 502 error, using your existing 'app' variable
+  uvicorn.run(app, host="::", port=port)
