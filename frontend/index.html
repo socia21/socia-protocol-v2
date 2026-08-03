@@ -868,15 +868,16 @@
           
           if (!response.ok) {
             alert("Registration notice: " + (data.detail || "Proceeding with verification gateway."));
+            return;
           }
-
-          generatedOTP = data.debug_otp_hint || Math.floor(100000 + Math.random() * 900000).toString();
         } catch (err) {
-          console.warn("Backend offline, utilizing fallback cryptographic sandbox OTP generation.");
-          generatedOTP = Math.floor(100000 + Math.random() * 900000).toString();
+          console.warn("Backend connection error during registration.");
+          alert("Unable to reach the server to dispatch verification code.");
+          return;
         }
 
-        alert(`[SECURE RAILWAY DISPATCH]: OTP verification code dispatched to ${email}.\n(Sandbox/Debug Hint Code: ${generatedOTP})`);
+        // Clean user prompt notifying them to check their actual email inbox
+        alert(`Verification code successfully dispatched to ${email}. Please check your Outlook inbox to proceed.`);
 
         document.getElementById('auth-step-1').style.display = 'none';
         document.getElementById('auth-step-2').style.display = 'block';
@@ -904,9 +905,9 @@
             localStorage.setItem('socia_token', tokenData.access_token);
           }
           userSession.name = email.split('@')[0];
-          userSession.role = 'sponsor'; // Default role assumption on sign-in if not fetched
+          userSession.role = 'sponsor'; 
         } catch (err) {
-          console.warn("Backend auth token endpoint unreachable; operating in sovereign local secure fallback mode for sign-in.");
+          console.warn("Backend auth token endpoint unreachable.");
         }
 
         userSession.isRegistered = true;
@@ -914,7 +915,6 @@
         initializeApp(currentRole);
       }
     }
-
     function backToAuthStep1() {
       document.getElementById('auth-step-2').style.display = 'none';
       document.getElementById('auth-step-1').style.display = 'block';

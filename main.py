@@ -161,7 +161,7 @@ def register_user(payload: RegisterRequest, session: Session = Depends(get_sessi
     
     return {
         "status": "pending_verification",
-        "message": f"OTP verification code successfully dispatched via Outlook to {payload.email}."
+        "message": f"Verification code successfully sent to {payload.email}. Please check your inbox."
     }
 
 @app.post("/auth/verify-otp")
