@@ -1,0 +1,10 @@
+
+pydantic-settings==2.2.1
+email-validator==2.1.1
+psycopg2-binary==2.9.9
+fastapi
+uvicorn
+sqlmodel
+pydantic
+pydantic[email]
+resend
