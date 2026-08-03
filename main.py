@@ -15,7 +15,6 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./socia_database.db")
 EMAIL_USER = os.getenv("EMAIL_USER", "socia2121@outlook.com")
 EMAIL_PASS = os.getenv("EMAIL_PASS", "riaanisriaan21")
 
-# Fix Postgres URL dialect for SQLModel/SQLAlchemy compatibility if needed
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
@@ -62,7 +61,7 @@ class DealLedgerRecord(SQLModel, table=True):
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
 
-app = FastAPI(title="SOCIA Protocol Institutional Backend", version="1.1.0")
+app = FastAPI(title="SOCIA Protocol Institutional Backend", version="1.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -125,8 +124,14 @@ class VerifyOTPRequest(BaseModel):
     email: EmailStr
     otp_code: str
 
+class PasswordChangeRequest(BaseModel):
+    email: EmailStr
+    old_password: str
+    new_password: str
+
 class UserSettingsUpdate(BaseModel):
     email: EmailStr
+    new_email: Optional[EmailStr] = None
     display_name: Optional[str] = None
     handle: Optional[str] = None
     company_name: Optional[str] = None
@@ -151,7 +156,7 @@ class DealSimulationRequest(BaseModel):
     amount: float
     conditions: List[str]
 
-# --- AUTHENTICATION & REGISTRATION ENDPOINTS ---
+# --- STRICT REGISTRATION & OTP ENDPOINTS ---
 @app.post("/auth/register")
 def register_user(payload: RegisterRequest, session: Session = Depends(get_session)):
     existing = session.exec(select(UserAccount).where(UserAccount.email == payload.email)).first()
@@ -195,6 +200,7 @@ def verify_otp(payload: VerifyOTPRequest, session: Session = Depends(get_session
     
     return {"status": "success", "message": "Account successfully verified and activated."}
 
+# --- DEDICATED SIGN-IN ENDPOINT ---
 @app.post("/auth/token")
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
     user = session.exec(select(UserAccount).where(UserAccount.email == form_data.username)).first()
@@ -204,9 +210,30 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), ses
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account pending email verification. Please complete OTP verification first."
+        )
     return {"access_token": f"socia-token-{user.email}", "token_type": "bearer"}
 
-# --- EXCLUSIVE PERMANENT ACCOUNT REGISTRY & PRIVATE SETTINGS ---
+# --- PASSWORD CHANGE ENDPOINT ---
+@app.post("/auth/change-password")
+def change_password(payload: PasswordChangeRequest, session: Session = Depends(get_session)):
+    user = session.exec(select(UserAccount).where(UserAccount.email == payload.email)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+    
+    if user.hashed_password != payload.old_password:
+        raise HTTPException(status_code=400, detail="Incorrect existing password.")
+    
+    user.hashed_password = payload.new_password
+    session.add(user)
+    session.commit()
+    
+    return {"status": "success", "message": "Password successfully updated."}
+
+# --- PRIVATE "MY ACCOUNT" SETTINGS ENDPOINTS ---
 @app.get("/api/account/settings")
 def get_account_settings(email: str, session: Session = Depends(get_session)):
     user = session.exec(select(UserAccount).where(UserAccount.email == email)).first()
@@ -233,6 +260,12 @@ def update_account_settings(payload: UserSettingsUpdate, session: Session = Depe
     if not user:
         raise HTTPException(status_code=404, detail="User account not found.")
     
+    if payload.new_email is not None and payload.new_email != user.email:
+        existing_email = session.exec(select(UserAccount).where(UserAccount.email == payload.new_email)).first()
+        if existing_email:
+            raise HTTPException(status_code=400, detail="Email address already in use by another account.")
+        user.email = payload.new_email
+
     if payload.display_name is not None:
         user.display_name = payload.display_name
     if payload.handle is not None:
@@ -252,7 +285,7 @@ def update_account_settings(payload: UserSettingsUpdate, session: Session = Depe
     session.commit()
     session.refresh(user)
     
-    return {"status": "success", "message": "Exclusive permanent account registry and private settings updated successfully."}
+    return {"status": "success", "message": "Private account settings updated successfully."}
 
 # --- MARKETPLACE & LISTING REGISTRY ---
 @app.post("/api/register")
