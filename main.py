@@ -4,7 +4,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
@@ -172,13 +172,15 @@ class DealSimulationRequest(BaseModel):
 
 # --- ENDPOINTS ---
 @app.post("/auth/register")
-def register_user(payload: RegisterRequest, session: Session = Depends(get_session)):
+def register_user(payload: RegisterRequest, background_tasks: BackgroundTasks, session: Session = Depends(get_session)):
     existing = session.exec(select(UserAccount).where(UserAccount.email == payload.email)).first()
     if existing:
         raise HTTPException(status_code=400, detail="Account with this email already registered.")
     
     generated_otp = str(random.randint(100000, 999999))
-    send_otp_email(payload.email, generated_otp)
+    
+    # Queue email task asynchronously so API responds immediately without hanging
+    background_tasks.add_task(send_otp_email, payload.email, generated_otp)
 
     user = UserAccount(
         email=payload.email,
