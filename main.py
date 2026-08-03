@@ -76,28 +76,30 @@ def get_session():
     with Session(engine) as session:
         yield session
 
-# --- HELPER: HTTPS API EMAIL DISPATCHER (BYPASSES SMTP BLOCK) ---
+# --- HELPER: HTTPS API EMAIL DISPATCHER WITH CONSOLE FALLBACK ---
 def send_otp_email(recipient_email: str, otp_code: str):
-    html_content = f"""
-    <div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
-        <h2 style="color: #38bdf8;">SOCIA Protocol Authentication</h2>
-        <p>Your secure verification code is:</p>
-        <div style="font-size: 32px; font-weight: bold; background: #1e293b; color: #38bdf8; padding: 12px 24px; display: inline-block; border-radius: 6px; letter-spacing: 4px;">{otp_code}</div>
-        <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">If you did not request this verification, please ignore this transmission.</p>
-    </div>
-    """
+    print(f"\n==========================================")
+    print(f"[OTP DEBUG BACKUP] Code for {recipient_email}: {otp_code}")
+    print(f"==========================================\n")
+    
     try:
         params = {
             "from": "SOCIA Protocol <onboarding@resend.dev>",
             "to": [recipient_email],
             "subject": "Your SOCIA Protocol Verification Code",
-            "html": html_content,
+            "html": f"""
+            <div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+                <h2 style="color: #38bdf8;">SOCIA Protocol Authentication</h2>
+                <p>Your secure verification code is:</p>
+                <div style="font-size: 32px; font-weight: bold; background: #1e293b; color: #38bdf8; padding: 12px 24px; display: inline-block; border-radius: 6px; letter-spacing: 4px;">{otp_code}</div>
+                <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">If you did not request this verification, please ignore this transmission.</p>
+            </div>
+            """,
         }
         response = resend.Emails.send(params)
         print(f"[RESEND SUCCESS] OTP dispatched via HTTPS API to {recipient_email}: {response}")
     except Exception as e:
-        print(f"[RESEND ERROR] Failed to dispatch verification email: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to dispatch verification email: {str(e)}")
+        print(f"[NETWORK WARNING] Could not reach external email server: {str(e)}. Continuing execution via console fallback.")
 
 # --- SCHEMAS ---
 class RegisterRequest(BaseModel):
@@ -168,7 +170,7 @@ def register_user(payload: RegisterRequest, session: Session = Depends(get_sessi
     
     return {
         "status": "pending_verification",
-        "message": f"Verification code successfully sent via secure API to {payload.email}. Please check your inbox."
+        "message": f"Verification code successfully initiated for {payload.email}. Check console/inbox."
     }
 
 @app.post("/auth/verify-otp")
