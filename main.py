@@ -26,11 +26,18 @@ class UserAccount(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
     hashed_password: str
-    role: str # 'sponsor' or 'influencer'
+    role: str  # 'sponsor' or 'influencer'
     display_name: str
     handle: str
     is_verified: bool = Field(default=False)
     otp_code: Optional[str] = Field(default=None)
+    
+    # Private Account Details & Permanent Registry Settings
+    company_name: Optional[str] = Field(default=None)
+    billing_address: Optional[str] = Field(default=None)
+    tax_id: Optional[str] = Field(default=None)
+    payout_details: Optional[str] = Field(default=None)
+    notification_preferences: Optional[str] = Field(default="all")
 
 class MarketplaceListing(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -41,7 +48,7 @@ class MarketplaceListing(SQLModel, table=True):
     rates: str
     stats: str
     bio: str
-    pre_conditions_str: str # comma separated
+    pre_conditions_str: str
     match_score: int = Field(default=98)
     verified: bool = Field(default=True)
 
@@ -55,7 +62,7 @@ class DealLedgerRecord(SQLModel, table=True):
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
 
-app = FastAPI(title="SOCIA Protocol Institutional Backend", version="1.0.0")
+app = FastAPI(title="SOCIA Protocol Institutional Backend", version="1.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -118,6 +125,16 @@ class VerifyOTPRequest(BaseModel):
     email: EmailStr
     otp_code: str
 
+class UserSettingsUpdate(BaseModel):
+    email: EmailStr
+    display_name: Optional[str] = None
+    handle: Optional[str] = None
+    company_name: Optional[str] = None
+    billing_address: Optional[str] = None
+    tax_id: Optional[str] = None
+    payout_details: Optional[str] = None
+    notification_preferences: Optional[str] = None
+
 class ListingCreate(BaseModel):
     contact: str
     name: str
@@ -142,8 +159,6 @@ def register_user(payload: RegisterRequest, session: Session = Depends(get_sessi
         raise HTTPException(status_code=400, detail="Account with this email already registered.")
     
     generated_otp = str(random.randint(100000, 999999))
-    
-    # Trigger actual Outlook email sending
     send_otp_email(payload.email, generated_otp)
 
     user = UserAccount(
@@ -190,6 +205,54 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), ses
             headers={"WWW-Authenticate": "Bearer"},
         )
     return {"access_token": f"socia-token-{user.email}", "token_type": "bearer"}
+
+# --- EXCLUSIVE PERMANENT ACCOUNT REGISTRY & PRIVATE SETTINGS ---
+@app.get("/api/account/settings")
+def get_account_settings(email: str, session: Session = Depends(get_session)):
+    user = session.exec(select(UserAccount).where(UserAccount.email == email)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User registry record not found.")
+    return {
+        "email": user.email,
+        "role": user.role,
+        "display_name": user.display_name,
+        "handle": user.handle,
+        "is_verified": user.is_verified,
+        "private_details": {
+            "company_name": user.company_name,
+            "billing_address": user.billing_address,
+            "tax_id": user.tax_id,
+            "payout_details": user.payout_details,
+            "notification_preferences": user.notification_preferences
+        }
+    }
+
+@app.put("/api/account/settings")
+def update_account_settings(payload: UserSettingsUpdate, session: Session = Depends(get_session)):
+    user = session.exec(select(UserAccount).where(UserAccount.email == payload.email)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+    
+    if payload.display_name is not None:
+        user.display_name = payload.display_name
+    if payload.handle is not None:
+        user.handle = payload.handle
+    if payload.company_name is not None:
+        user.company_name = payload.company_name
+    if payload.billing_address is not None:
+        user.billing_address = payload.billing_address
+    if payload.tax_id is not None:
+        user.tax_id = payload.tax_id
+    if payload.payout_details is not None:
+        user.payout_details = payload.payout_details
+    if payload.notification_preferences is not None:
+        user.notification_preferences = payload.notification_preferences
+        
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    
+    return {"status": "success", "message": "Exclusive permanent account registry and private settings updated successfully."}
 
 # --- MARKETPLACE & LISTING REGISTRY ---
 @app.post("/api/register")
