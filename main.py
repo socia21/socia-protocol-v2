@@ -94,12 +94,14 @@ def get_session():
 
 # --- HELPER: GOOGLE WORKSPACE SMTP EMAIL DISPATCHER (sociacreator@contactsocia.com) ---
 def send_otp_email(recipient_email: str, otp_code: str):
+    # ALWAYS print to logs first so you have the code instantly even if Google fails
     print(f"\n==========================================")
     print(f"[OTP DEBUG BACKUP] Code for {recipient_email}: {otp_code}")
     print(f"==========================================\n")
 
-    if not GMAIL_APP_PASSWORD:
-        print("[EMAIL ERROR] GMAIL_APP_PASSWORD is not set. Skipping send, OTP only available in logs above.")
+    app_password = (GMAIL_APP_PASSWORD or "").strip()
+    if not app_password:
+        print("[EMAIL ERROR] GMAIL_APP_PASSWORD is not set or empty. Skipping send, OTP only available in logs above.")
         return
 
     html_body = f"""
@@ -118,9 +120,10 @@ def send_otp_email(recipient_email: str, otp_code: str):
     msg.attach(MIMEText(html_body, "html"))
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+        # Connected with a strict 5-second timeout so it never hangs server workers
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=5) as server:
             server.starttls()
-            server.login(GMAIL_SENDER, GMAIL_APP_PASSWORD)
+            server.login(GMAIL_SENDER, app_password)
             server.sendmail(GMAIL_SENDER, [recipient_email], msg.as_string())
         print(f"[SMTP SUCCESS] OTP dispatched via Google Workspace to {recipient_email}")
     except Exception as e:
