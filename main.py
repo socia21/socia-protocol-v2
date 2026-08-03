@@ -1,16 +1,23 @@
 import os
 import random
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from sqlmodel import Field, SQLModel, Session, create_engine, select
-import resend
 
 # Environment Variables
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./socia_database.db")
-resend.api_key = os.getenv("RESEND_API_KEY", "re_your_api_key_here")
+
+# Google Workspace SMTP credentials (sociacreator@contactsocia.com)
+GMAIL_SENDER = os.getenv("GMAIL_SENDER", "sociacreator@contactsocia.com")
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")  # 16-char App Password, set in Railway Variables
+SMTP_HOST = "smtp.gmail.com"
+SMTP_PORT = 587
 
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -60,9 +67,18 @@ def create_db_and_tables():
 
 app = FastAPI(title="SOCIA Protocol Institutional Backend", version="1.4.0")
 
+ALLOWED_ORIGINS = [
+    "https://contactsocia.com",
+    "https://www.contactsocia.com",
+]
+# Add your Railway-provided domain too, useful during transition/testing:
+railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
+if railway_domain:
+    ALLOWED_ORIGINS.append(f"https://{railway_domain}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -76,30 +92,39 @@ def get_session():
     with Session(engine) as session:
         yield session
 
-# --- HELPER: HTTPS API EMAIL DISPATCHER WITH CONSOLE FALLBACK ---
+# --- HELPER: GOOGLE WORKSPACE SMTP EMAIL DISPATCHER (sociacreator@contactsocia.com) ---
 def send_otp_email(recipient_email: str, otp_code: str):
     print(f"\n==========================================")
     print(f"[OTP DEBUG BACKUP] Code for {recipient_email}: {otp_code}")
     print(f"==========================================\n")
-    
+
+    if not GMAIL_APP_PASSWORD:
+        print("[EMAIL ERROR] GMAIL_APP_PASSWORD is not set. Skipping send, OTP only available in logs above.")
+        return
+
+    html_body = f"""
+    <div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
+        <h2 style="color: #38bdf8;">SOCIA Protocol Authentication</h2>
+        <p>Your secure verification code is:</p>
+        <div style="font-size: 32px; font-weight: bold; background: #1e293b; color: #38bdf8; padding: 12px 24px; display: inline-block; border-radius: 6px; letter-spacing: 4px;">{otp_code}</div>
+        <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">If you did not request this verification, please ignore this transmission.</p>
+    </div>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Your SOCIA Protocol Verification Code"
+    msg["From"] = f"SOCIA Protocol <{GMAIL_SENDER}>"
+    msg["To"] = recipient_email
+    msg.attach(MIMEText(html_body, "html"))
+
     try:
-        params = {
-            "from": "SOCIA Protocol <onboarding@resend.dev>",
-            "to": [recipient_email],
-            "subject": "Your SOCIA Protocol Verification Code",
-            "html": f"""
-            <div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
-                <h2 style="color: #38bdf8;">SOCIA Protocol Authentication</h2>
-                <p>Your secure verification code is:</p>
-                <div style="font-size: 32px; font-weight: bold; background: #1e293b; color: #38bdf8; padding: 12px 24px; display: inline-block; border-radius: 6px; letter-spacing: 4px;">{otp_code}</div>
-                <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">If you did not request this verification, please ignore this transmission.</p>
-            </div>
-            """,
-        }
-        response = resend.Emails.send(params)
-        print(f"[RESEND SUCCESS] OTP dispatched via HTTPS API to {recipient_email}: {response}")
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+            server.starttls()
+            server.login(GMAIL_SENDER, GMAIL_APP_PASSWORD)
+            server.sendmail(GMAIL_SENDER, [recipient_email], msg.as_string())
+        print(f"[SMTP SUCCESS] OTP dispatched via Google Workspace to {recipient_email}")
     except Exception as e:
-        print(f"[NETWORK WARNING] Could not reach external email server: {str(e)}. Continuing execution via console fallback.")
+        print(f"[SMTP ERROR] Could not send via Google Workspace: {str(e)}. OTP still available in logs above.")
 
 # --- SCHEMAS ---
 class RegisterRequest(BaseModel):
