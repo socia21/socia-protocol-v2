@@ -1,9 +1,40 @@
+const express = require('express');
 const { spawn } = require('child_process');
-const PYTHON_PORT = process.env.PORT || 8001;
+const path = require('path');
+const httpProxy = require('http-proxy');
+require('dotenv').config();
 
-// Spawn Python with inherited environment variables including DATABASE_URL
-const pythonProcess = spawn('uvicorn', ['main:app', '--host', '127.0.0.1', '--port', PYTHON_PORT.toString()], {
-  stdio: ['inherit', 'inherit', 'pipe'], // Capture stderr separately for debugging
+const app = express();
+const proxy = httpProxy.createProxyServer({});
+const PORT = process.env.PORT || 8000;
+const PYTHON_PORT = 8001;
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// 1. Health check for Railway
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'online', protocol: 'SOCIA Escrow Engine' });
+});
+
+// 2. Proxy API and Auth requests to FastAPI running on port 8001
+app.all(['/api*', '/auth*'], (req, res) => {
+  proxy.web(req, res, { target: `http://127.0.0.1:${PYTHON_PORT}` }, (err) => {
+    res.status(502).json({ error: 'Backend protocol service unavailable.' });
+  });
+});
+
+// 3. Serve static frontend files
+app.use(express.static(path.join(__dirname)));
+
+// 4. Fallback to index.html for frontend single-page routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Spawn Python FastAPI child process safely using python3 -m uvicorn
+const pythonProcess = spawn('python3', ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', PYTHON_PORT.toString()], {
+  stdio: ['inherit', 'inherit', 'pipe'],
   shell: true,
   env: { ...process.env, PYTHONUNBUFFERED: "true" }
 });
@@ -14,27 +45,8 @@ pythonProcess.stderr.on('data', (data) => {
 
 pythonProcess.on('exit', (code, signal) => {
   console.error(`[FastAPI Process exited with code ${code} and signal ${signal}]`);
-  // Optional: Trigger an automatic restart or gracefully shut down Node
 });
-```[cite: 10]
 
----
-
-### Step 3: Enforce Robust Database Initialization
-FastAPI crashes on startup usually stem from unhandled database exceptions during table creation. Wrap your database engine initialization inside a safe try-except block in `main.py` to prevent the app from dying before Uvicorn can bind to the port:
-
-```python
-import os
-from sqlmodel import SQLModel, create_engine
-
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./socia_database.db")
-
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-try:
-    engine = create_engine(DATABASE_URL, echo=True)
-    def init_db():
-        SQLModel.metadata.create_all(engine)
-except Exception as e:
-    print(f"Database initialization warning: {e}")
+app.listen(PORT, () => {
+  console.log(`[SOCIA GATEWAY] Node server active on port ${PORT}. Proxying API to FastAPI on port ${PYTHON_PORT}.`);
+});
