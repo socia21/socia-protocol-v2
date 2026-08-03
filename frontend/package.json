@@ -19,11 +19,7 @@
 }
 ```[cite: 9]
 
----
-
-### 2. `server.js`
-*Corrects proxy matching rules and safeguards against child-process termination errors.*
-
+2. **`server.js`** (Replace your existing file with this):
 ```javascript
 const express = require('express');
 const { spawn } = require('child_process');
@@ -39,27 +35,22 @@ const PYTHON_PORT = 8001;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 1. Health check for Railway
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'online', protocol: 'SOCIA Escrow Engine' });
 });
 
-// 2. Proxy API and Auth requests to FastAPI running on port 8001
 app.all(['/api*', '/auth*'], (req, res) => {
   proxy.web(req, res, { target: `http://127.0.0.1:${PYTHON_PORT}` }, (err) => {
     res.status(502).json({ error: 'Backend protocol service unavailable.' });
   });
 });
 
-// 3. Serve static frontend files
 app.use(express.static(path.join(__dirname)));
 
-// 4. Fallback to index.html for frontend single-page routing
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Spawn Python FastAPI child process safely
 const pythonProcess = spawn('uvicorn', ['main:app', '--host', '127.0.0.1', '--port', PYTHON_PORT.toString()], {
   stdio: 'inherit',
   shell: true
@@ -74,11 +65,7 @@ app.listen(PORT, () => {
 });
 ```[cite: 10]
 
----
-
-### 3. `main.py`
-*FastAPI backend script with fully typed endpoints and SQLModel database integration.*
-
+3. **`main.py`** (Replace your existing file with this):
 ```python
 import os
 import random
@@ -89,23 +76,20 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from sqlmodel import Field, SQLModel, Session, create_engine, select
 
-# Environment Variables from Railway Configuration
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./socia_database.db")
 EMAIL_USER = os.getenv("EMAIL_USER", "secure-dispatcher@socia.protocol")
 EMAIL_PASS = os.getenv("EMAIL_PASS", "mock-smtp-password")
 
-# Fix Postgres URL dialect for SQLModel/SQLAlchemy compatibility if needed
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 engine = create_engine(DATABASE_URL, echo=True)
 
-# --- DATABASE MODELS ---
 class UserAccount(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
     hashed_password: str
-    role: str # 'sponsor' or 'influencer'
+    role: str 
     display_name: str
     handle: str
     is_verified: bool = Field(default=False)
@@ -120,7 +104,7 @@ class MarketplaceListing(SQLModel, table=True):
     rates: str
     stats: str
     bio: str
-    pre_conditions_str: str # comma separated
+    pre_conditions_str: str 
     match_score: int = Field(default=98)
     verified: bool = Field(default=True)
 
@@ -152,7 +136,6 @@ def get_session():
     with Session(engine) as session:
         yield session
 
-# --- SCHEMAS ---
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
@@ -180,7 +163,6 @@ class DealSimulationRequest(BaseModel):
     amount: float
     conditions: List[str]
 
-# --- AUTHENTICATION & REGISTRATION ENDPOINTS ---
 @app.post("/auth/register")
 def register_user(payload: RegisterRequest, session: Session = Depends(get_session)):
     existing = session.exec(select(UserAccount).where(UserAccount.email == payload.email)).first()
@@ -188,8 +170,6 @@ def register_user(payload: RegisterRequest, session: Session = Depends(get_sessi
         raise HTTPException(status_code=400, detail="Account with this email already registered.")
     
     generated_otp = str(random.randint(100000, 999999))
-    print(f"[SMTP DISPATCH MOCK] Sending OTP {generated_otp} to {payload.email} using account {EMAIL_USER}")
-
     user = UserAccount(
         email=payload.email,
         hashed_password=payload.password,
@@ -236,7 +216,6 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), ses
         )
     return {"access_token": f"socia-token-{user.email}", "token_type": "bearer"}
 
-# --- MARKETPLACE & LISTING REGISTRY ---
 @app.post("/api/register")
 def create_listing(payload: ListingCreate, session: Session = Depends(get_session)):
     cond_str = ", ".join(payload.pre_conditions)
@@ -272,7 +251,6 @@ def get_marketplace_listings(role: str, session: Session = Depends(get_session))
         })
     return formatted
 
-# --- ESCROW & DEALS LEDGER ---
 @app.post("/api/deals/simulate")
 def simulate_deal(payload: DealSimulationRequest, session: Session = Depends(get_session)):
     ref_id = f"REF-{random.randint(100000, 999999)}"
@@ -292,10 +270,20 @@ def get_deal_history(session: Session = Depends(get_session)):
     return deals
 ```[cite: 11]
 
----
-
-### 4. `Procfile`
-*Directs deployment runners to start the Node server which automatically boots up the FastAPI process via proxying.*
-
+4. **`Procfile`** (Create a file named `Procfile` with no extension, containing exactly this line):
 ```text
 web: node server.js
+nixpacks.toml (Create a file named nixpacks.toml in your root directory to ensure Railway installs both Node and Python environment dependencies cleanly):
+
+Ini, TOML
+[phases.setup]
+nixPkgs = ["nodejs", "python3", "python3Packages.pip"]
+
+[phases.build]
+cmds = [
+  "npm install",
+  "pip install -r requirements.txt"
+]
+
+[phases.start]
+cmd = "node server.js"

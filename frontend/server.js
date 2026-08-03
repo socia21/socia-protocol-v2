@@ -1,42 +1,40 @@
-const express = require('express');
 const { spawn } = require('child_process');
-const path = require('path');
-const httpProxy = require('http-proxy');
-require('dotenv').config();
+const PYTHON_PORT = process.env.PORT || 8001;
 
-const app = express();
-const proxy = httpProxy.createProxyServer({});
-const PORT = process.env.PORT || 8000;
-const PYTHON_PORT = 8001;
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'online', protocol: 'SOCIA Escrow Engine' });
-});
-
-app.all(['/api*', '/auth*'], (req, res) => {
-  proxy.web(req, res, { target: `http://127.0.0.1:${PYTHON_PORT}` }, (err) => {
-    res.status(502).json({ error: 'Backend protocol service unavailable.' });
-  });
-});
-
-app.use(express.static(path.join(__dirname)));
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
+// Spawn Python with inherited environment variables including DATABASE_URL
 const pythonProcess = spawn('uvicorn', ['main:app', '--host', '127.0.0.1', '--port', PYTHON_PORT.toString()], {
-  stdio: 'inherit',
-  shell: true
+  stdio: ['inherit', 'inherit', 'pipe'], // Capture stderr separately for debugging
+  shell: true,
+  env: { ...process.env, PYTHONUNBUFFERED: "true" }
 });
 
-pythonProcess.on('error', (err) => {
-  console.error('Failed to start FastAPI subprocess:', err);
+pythonProcess.stderr.on('data', (data) => {
+  console.error(`[FastAPI Error]: ${data.toString()}`);
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[SOCIA GATEWAY] Node server active on port ${PORT}. Proxying API to FastAPI on port ${PYTHON_PORT}.`);
+pythonProcess.on('exit', (code, signal) => {
+  console.error(`[FastAPI Process exited with code ${code} and signal ${signal}]`);
+  // Optional: Trigger an automatic restart or gracefully shut down Node
 });
+```[cite: 10]
+
+---
+
+### Step 3: Enforce Robust Database Initialization
+FastAPI crashes on startup usually stem from unhandled database exceptions during table creation. Wrap your database engine initialization inside a safe try-except block in `main.py` to prevent the app from dying before Uvicorn can bind to the port:
+
+```python
+import os
+from sqlmodel import SQLModel, create_engine
+
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./socia_database.db")
+
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+try:
+    engine = create_engine(DATABASE_URL, echo=True)
+    def init_db():
+        SQLModel.metadata.create_all(engine)
+except Exception as e:
+    print(f"Database initialization warning: {e}")
