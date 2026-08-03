@@ -32,10 +32,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Spawn Python FastAPI child process safely using python3 -m uvicorn
+// Spawn Python FastAPI child process safely using python3 -m uvicorn with shell: false
 const pythonProcess = spawn('python3', ['-m', 'uvicorn', 'main:app', '--host', '127.0.0.1', '--port', PYTHON_PORT.toString()], {
   stdio: ['inherit', 'inherit', 'pipe'],
-  shell: true,
+  shell: false,
   env: { ...process.env, PYTHONUNBUFFERED: "true" }
 });
 
@@ -50,3 +50,4 @@ pythonProcess.on('exit', (code, signal) => {
 app.listen(PORT, () => {
   console.log(`[SOCIA GATEWAY] Node server active on port ${PORT}. Proxying API to FastAPI on port ${PYTHON_PORT}.`);
 });
+```[cite: 2]
