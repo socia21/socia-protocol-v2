@@ -1,19 +1,16 @@
 import os
 import random
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from sqlmodel import Field, SQLModel, Session, create_engine, select
+import resend
 
-# Environment Variables or Direct Fallbacks for Outlook Credentials
+# Environment Variables
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./socia_database.db")
-EMAIL_USER = os.getenv("EMAIL_USER", "socia2121@outlook.com")
-EMAIL_PASS = os.getenv("EMAIL_PASS", "riaanisriaan21")
+resend.api_key = os.getenv("RESEND_API_KEY", "re_your_api_key_here")
 
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -31,12 +28,12 @@ class UserAccount(SQLModel, table=True):
     is_verified: bool = Field(default=False)
     otp_code: Optional[str] = Field(default=None)
     
-    # Private Account Details & Permanent Registry Settings
     company_name: Optional[str] = Field(default=None)
     billing_address: Optional[str] = Field(default=None)
     tax_id: Optional[str] = Field(default=None)
     payout_details: Optional[str] = Field(default=None)
     notification_preferences: Optional[str] = Field(default="all")
+    avatar_url: Optional[str] = Field(default=None)
 
 class MarketplaceListing(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -61,7 +58,7 @@ class DealLedgerRecord(SQLModel, table=True):
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
 
-app = FastAPI(title="SOCIA Protocol Institutional Backend", version="1.2.0")
+app = FastAPI(title="SOCIA Protocol Institutional Backend", version="1.4.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -79,18 +76,9 @@ def get_session():
     with Session(engine) as session:
         yield session
 
-# --- HELPER: REAL OUTLOOK SMTP EMAIL DISPATCHER ---
+# --- HELPER: HTTPS API EMAIL DISPATCHER (BYPASSES SMTP BLOCK) ---
 def send_otp_email(recipient_email: str, otp_code: str):
-    smtp_server = "smtp-mail.outlook.com"
-    smtp_port = 587
-    
-    message = MIMEMultipart("alternative")
-    message["Subject"] = "Your SOCIA Protocol Verification Code"
-    message["From"] = EMAIL_USER
-    message["To"] = recipient_email
-    
-    text = f"Welcome to SOCIA Protocol.\n\nYour account verification code is: {otp_code}\n\nPlease enter this code to activate your institutional profile."
-    html = f"""
+    html_content = f"""
     <div style="font-family: Arial, sans-serif; padding: 20px; background: #0f172a; color: #f8fafc; border-radius: 8px;">
         <h2 style="color: #38bdf8;">SOCIA Protocol Authentication</h2>
         <p>Your secure verification code is:</p>
@@ -98,18 +86,17 @@ def send_otp_email(recipient_email: str, otp_code: str):
         <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">If you did not request this verification, please ignore this transmission.</p>
     </div>
     """
-    
-    message.attach(MIMEText(text, "plain"))
-    message.attach(MIMEText(html, "html"))
-    
     try:
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASS)
-            server.sendmail(EMAIL_USER, recipient_email, message.as_string())
-        print(f"[SMTP SUCCESS] OTP email successfully sent to {recipient_email}")
+        params = {
+            "from": "SOCIA Protocol <onboarding@resend.dev>",
+            "to": [recipient_email],
+            "subject": "Your SOCIA Protocol Verification Code",
+            "html": html_content,
+        }
+        response = resend.Emails.send(params)
+        print(f"[RESEND SUCCESS] OTP dispatched via HTTPS API to {recipient_email}: {response}")
     except Exception as e:
-        print(f"[SMTP ERROR] Failed to send email via Outlook: {str(e)}")
+        print(f"[RESEND ERROR] Failed to dispatch verification email: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to dispatch verification email: {str(e)}")
 
 # --- SCHEMAS ---
@@ -156,7 +143,7 @@ class DealSimulationRequest(BaseModel):
     amount: float
     conditions: List[str]
 
-# --- STRICT REGISTRATION & OTP ENDPOINTS ---
+# --- ENDPOINTS ---
 @app.post("/auth/register")
 def register_user(payload: RegisterRequest, session: Session = Depends(get_session)):
     existing = session.exec(select(UserAccount).where(UserAccount.email == payload.email)).first()
@@ -181,7 +168,7 @@ def register_user(payload: RegisterRequest, session: Session = Depends(get_sessi
     
     return {
         "status": "pending_verification",
-        "message": f"Verification code successfully sent to {payload.email}. Please check your inbox."
+        "message": f"Verification code successfully sent via secure API to {payload.email}. Please check your inbox."
     }
 
 @app.post("/auth/verify-otp")
@@ -198,9 +185,8 @@ def verify_otp(payload: VerifyOTPRequest, session: Session = Depends(get_session
     session.add(user)
     session.commit()
     
-    return {"status": "success", "message": "Account successfully verified and activated."}
+    return {"status": "success", "message": "Account successfully verified and activated in database."}
 
-# --- DEDICATED SIGN-IN ENDPOINT ---
 @app.post("/auth/token")
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
     user = session.exec(select(UserAccount).where(UserAccount.email == form_data.username)).first()
@@ -217,7 +203,6 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), ses
         )
     return {"access_token": f"socia-token-{user.email}", "token_type": "bearer"}
 
-# --- PASSWORD CHANGE ENDPOINT ---
 @app.post("/auth/change-password")
 def change_password(payload: PasswordChangeRequest, session: Session = Depends(get_session)):
     user = session.exec(select(UserAccount).where(UserAccount.email == payload.email)).first()
@@ -233,7 +218,6 @@ def change_password(payload: PasswordChangeRequest, session: Session = Depends(g
     
     return {"status": "success", "message": "Password successfully updated."}
 
-# --- PRIVATE "MY ACCOUNT" SETTINGS ENDPOINTS ---
 @app.get("/api/account/settings")
 def get_account_settings(email: str, session: Session = Depends(get_session)):
     user = session.exec(select(UserAccount).where(UserAccount.email == email)).first()
@@ -245,6 +229,7 @@ def get_account_settings(email: str, session: Session = Depends(get_session)):
         "display_name": user.display_name,
         "handle": user.handle,
         "is_verified": user.is_verified,
+        "avatar_url": user.avatar_url,
         "private_details": {
             "company_name": user.company_name,
             "billing_address": user.billing_address,
@@ -287,7 +272,29 @@ def update_account_settings(payload: UserSettingsUpdate, session: Session = Depe
     
     return {"status": "success", "message": "Private account settings updated successfully."}
 
-# --- MARKETPLACE & LISTING REGISTRY ---
+@app.post("/api/account/upload-avatar")
+async def upload_avatar(email: str, file: UploadFile = File(...), session: Session = Depends(get_session)):
+    user = session.exec(select(UserAccount).where(UserAccount.email == email)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+    
+    upload_dir = "./uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    file_extension = file.filename.split(".")[-1]
+    file_name = f"avatar_{user.id}_{random.randint(1000, 9999)}.{file_extension}"
+    file_path = os.path.join(upload_dir, file_name)
+    
+    with open(file_path, "wb") as buffer:
+        content = await file.read()
+        buffer.write(content)
+        
+    user.avatar_url = f"/{file_path}"
+    session.add(user)
+    session.commit()
+    
+    return {"status": "success", "avatar_url": user.avatar_url, "message": "File uploaded and avatar updated successfully."}
+
 @app.post("/api/register")
 def create_listing(payload: ListingCreate, session: Session = Depends(get_session)):
     cond_str = ", ".join(payload.pre_conditions)
@@ -323,7 +330,6 @@ def get_marketplace_listings(role: str, session: Session = Depends(get_session))
         })
     return formatted
 
-# --- ESCROW & DEALS LEDGER ---
 @app.post("/api/deals/simulate")
 def simulate_deal(payload: DealSimulationRequest, session: Session = Depends(get_session)):
     ref_id = f"REF-{random.randint(100000, 999999)}"
