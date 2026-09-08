@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Privacy Policy — SOCIA Protocol</title>
+<style>
+  body { font-family: Georgia, serif; background: #f8fafc; color: #1e293b; max-width: 780px; margin: 0 auto; padding: 3rem 1.5rem 6rem; line-height: 1.6; }
+  h1 { font-size: 1.8rem; border-bottom: 2px solid #0f172a; padding-bottom: 0.5rem; }
+  h2 { font-size: 1.15rem; margin-top: 2rem; color: #0f172a; }
+  a { color: #0369a1; }
+  code { background: #fef9c3; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.85em; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  td, th { border: 1px solid #cbd5e1; padding: 0.5rem; text-align: left; font-size: 0.9rem; }
+  .back-link { display: inline-block; margin-bottom: 2rem; font-family: -apple-system, sans-serif; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<a class="back-link" href="/">&larr; Back to SOCIA Protocol</a>
+<p>⚠️ <strong>DRAFT — NOT LEGAL ADVICE.</strong> This has <strong>not</strong> been reviewed by a lawyer. Do not publish or rely on it as your live Privacy Policy until reviewed by a licensed attorney familiar with applicable data protection law (e.g. GDPR if you have EU users, CCPA if you have California users). Placeholders are marked <code>[LIKE THIS]</code>.</p>
+<hr />
+<h1 id="socia-protocol-privacy-policy">SOCIA Protocol — Privacy Policy</h1>
+<p><strong>Last Updated:</strong> <code>[DATE]</code></p>
+<h2 id="what-we-collect">1. What We Collect</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Category</th>
+<th>Examples</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Account data</td>
+<td>Email, password (stored as a salted PBKDF2 hash — we never see or store your plaintext password), display name, handle, role</td>
+<td>Account creation, login, identity</td>
+</tr>
+<tr class="even">
+<td>Verification data</td>
+<td>One-time password (OTP) codes</td>
+<td>Email verification and password reset</td>
+</tr>
+<tr class="odd">
+<td>Billing/business data</td>
+<td>Company name, billing address, tax ID, payout details</td>
+<td>Enabling escrow payouts (when payment integration is active)</td>
+</tr>
+<tr class="even">
+<td>Listing data</td>
+<td>Industry, rates, budget range, audience size, engagement rate, niche tags, bio</td>
+<td>Powering the matching algorithm and public marketplace listings</td>
+</tr>
+<tr class="odd">
+<td>Communications</td>
+<td>Pitch/proposal content, negotiation chat messages, support ticket content</td>
+<td>Enabling the core negotiation and support features</td>
+</tr>
+<tr class="even">
+<td>Technical data</td>
+<td>IP address (for rate-limiting and security), login timestamps</td>
+<td>Fraud prevention, abuse prevention, security auditing</td>
+</tr>
+</tbody>
+</table>
+<h2 id="how-we-use-your-data">2. How We Use Your Data</h2>
+<ul>
+<li>To operate your account and authenticate your logins (via signed session tokens)</li>
+<li>To power the algorithmic matching system, which compares your listing’s structured data (budget, niche, audience size, engagement rate) against other users’ listings to generate compatibility scores</li>
+<li>To facilitate pitches, negotiations, and (where enabled) escrow transactions</li>
+<li>To respond to support requests</li>
+<li>To detect and prevent fraud, abuse, and unauthorized access (e.g. rate-limiting login attempts, audit logging of security-relevant account events)</li>
+<li>To send you service-related emails (OTP codes, pitch notifications, password resets) via <code>[YOUR EMAIL SENDING DOMAIN]</code></li>
+</ul>
+<h2 id="what-we-never-do">3. What We Never Do</h2>
+<ul>
+<li>We do not sell your personal data to third parties.</li>
+<li>We do not store your password in a readable form — only a one-way cryptographic hash.</li>
+<li>We do not use your data for purposes unrelated to operating the Platform without asking you first.</li>
+</ul>
+<h2 id="who-we-share-data-with">4. Who We Share Data With</h2>
+<ul>
+<li><strong>Licensed payment partner</strong> (<code>[NAME, e.g. Stripe]</code>), where escrow/payment functionality is enabled, to process transactions.</li>
+<li><strong>Email delivery</strong> via Google Workspace, to send verification and notification emails.</li>
+<li><strong>Hosting infrastructure</strong> (Railway, and its underlying cloud/database providers) to run the Platform and store data.</li>
+<li><strong>Other Platform users</strong>, limited to what you choose to include in your public listing, and what’s necessary for a pitch/negotiation counterparty to see (name, contact email, listing details, negotiation messages).</li>
+<li>We may disclose data if required by law, subpoena, or to protect the safety of our users.</li>
+</ul>
+<h2 id="data-retention">5. Data Retention</h2>
+<p>We retain your account data for as long as your account is active. If you delete your account, your listings are permanently removed. Historical negotiation and transaction records tied to a completed deal with another user may be retained in anonymized/minimal form for legal, accounting, and dispute-resolution purposes, consistent with <code>[YOUR RECORD RETENTION POLICY / APPLICABLE LAW]</code>.</p>
+<h2 id="your-rights">6. Your Rights</h2>
+<p>You can, at any time from your Account Settings: - <strong>Access/export your data</strong> — a full export of your account, listings, pitches, negotiations, and support tickets is available on request. - <strong>Delete your account</strong> — permanently removes your account and listings. This requires re-entering your password and typing a confirmation phrase, since it cannot be undone. - <strong>Correct your data</strong> — update your profile, listing, and billing information at any time.</p>
+<p>If you are located in the EU/EEA, UK, or California, you may have additional rights under GDPR or CCPA respectively, including the right to lodge a complaint with a supervisory authority. <code>[EXPAND THIS SECTION WITH COUNSEL IF YOU SERVE THESE REGIONS.]</code></p>
+<h2 id="security-measures">7. Security Measures</h2>
+<ul>
+<li>Passwords are hashed with PBKDF2-HMAC-SHA256 and a unique per-user salt — never stored or logged in plaintext.</li>
+<li>Sessions use signed, time-limited authentication tokens (JWT).</li>
+<li>All traffic is encrypted in transit via HTTPS/TLS.</li>
+<li>Login, password-change, and account-recovery endpoints are rate-limited to reduce brute-force risk.</li>
+<li>Security-relevant account events (logins, failed login attempts, password changes, listing deletions) are logged to an internal audit trail.</li>
+</ul>
+<p>No system is 100% secure, and we cannot guarantee absolute security of your data.</p>
+<h2 id="cookies-local-storage">8. Cookies &amp; Local Storage</h2>
+<p>SOCIA stores your session token in your browser’s local storage to keep you logged in between visits. We do not use third-party advertising or tracking cookies. <code>[UPDATE IF YOU ADD ANALYTICS/ADVERTISING TOOLS LATER.]</code></p>
+<h2 id="childrens-privacy">9. Children’s Privacy</h2>
+<p>SOCIA is not directed at, and may not be used by, anyone under 18 years of age. We do not knowingly collect data from minors.</p>
+<h2 id="international-data-transfers">10. International Data Transfers</h2>
+<p><code>[COMPLETE IF YOU HAVE USERS OUTSIDE YOUR HOSTING REGION — describe cross-border transfer safeguards.]</code></p>
+<h2 id="changes-to-this-policy">11. Changes to This Policy</h2>
+<p>We may update this Privacy Policy from time to time. Material changes will be communicated to your registered email.</p>
+<h2 id="contact">12. Contact</h2>
+<p>Questions or data requests: <code>[SUPPORT EMAIL]</code></p>
+</body></html>
