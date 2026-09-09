@@ -80,10 +80,15 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      /* NOT "center": a centered flex container that overflows makes the overflow
+         unreachable by scrolling in most browsers (scrollHeight never grows past
+         clientHeight) -- exactly what was cutting off the bottom of this form on
+         shorter screens. flex-start + padding keeps it looking centered on tall
+         viewports while guaranteeing it's always fully scrollable when it doesn't fit. */
+      justify-content: flex-start;
       z-index: 9999;
       color: var(--white);
-      padding: 2rem;
+      padding: 3rem 2rem;
       overflow-y: auto;
       isolation: isolate;
     }
@@ -108,7 +113,7 @@
     @keyframes orbDrift2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-35px,-25px) scale(1.1); } }
     @media (prefers-reduced-motion: reduce) { .gateway-orb-gold, .gateway-orb-blue { animation: none; } }
 
-    .gateway-header-wrap { display: flex; flex-direction: column; align-items: center; animation: gatewayRise 0.7s cubic-bezier(0.16,1,0.3,1) both; }
+    .gateway-header-wrap { display: flex; flex-direction: column; align-items: center; animation: gatewayRise 0.7s cubic-bezier(0.16,1,0.3,1) both; flex-shrink: 0; }
     .gateway-title { font-size: 3.5rem; margin-bottom: 0.25rem; letter-spacing: 6px; color: var(--white); text-shadow: 0 0 30px rgba(212,175,55,0.25); position: relative; }
     .gateway-live-badge { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.65rem; letter-spacing: 1.5px; text-transform: uppercase; color: var(--trust-green); background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); padding: 0.25rem 0.7rem; border-radius: 20px; margin-bottom: 0.9rem; }
     .gateway-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--trust-green); box-shadow: 0 0 8px var(--trust-green); animation: livePulse 2s ease-in-out infinite; }
@@ -128,6 +133,7 @@
       box-shadow: 0 24px 60px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
       position: relative;
       overflow: hidden;
+      flex-shrink: 0;
       animation: gatewayRise 0.7s 0.1s cubic-bezier(0.16,1,0.3,1) both;
     }
     .gateway-box::before {
@@ -191,6 +197,7 @@
       gap: 1rem;
       flex-wrap: wrap;
       justify-content: center;
+      flex-shrink: 0;
       animation: gatewayRise 0.7s 0.2s cubic-bezier(0.16,1,0.3,1) both;
     }
     .trust-pill {
@@ -855,10 +862,76 @@
               </div>
             </div>
 
-            <!-- SECTION 6 — Optional Match Bonus -->
+            <!-- SECTION 6 — Collaboration Format & Logistics -->
+            <div class="reg-section reg-section-emphasis">
+              <div class="reg-section-head">
+                <span class="reg-section-num">6</span><span class="reg-section-title">Collaboration Format & Logistics</span>
+                <span class="reg-section-flag reg-flag-required">Required — powers your compatibility scores</span>
+              </div>
+              <div style="margin-bottom: 0.85rem;">
+                <label style="font-size: 0.75rem; font-weight: 600; display: block; margin-bottom: 0.4rem;" id="label-collab-types">Collaboration Type(s) (select all that apply)</label>
+                <div id="tab-reg-collab-checkboxes" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+              </div>
+              <div style="margin-bottom: 0.85rem;">
+                <label style="font-size: 0.75rem; font-weight: 600; display: block; margin-bottom: 0.4rem;" id="label-content-formats">Content Format(s) (select all that apply)</label>
+                <div id="tab-reg-format-checkboxes" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+              </div>
+              <div style="margin-bottom: 0.6rem; max-width: 320px;">
+                <label style="font-size: 0.75rem; font-weight: 600;" id="label-turnaround">Turnaround (days)</label>
+                <input type="number" id="tab-reg-turnaround" class="form-control" placeholder="7">
+                <p style="font-size: 0.68rem; color: var(--text-muted); margin: 0.25rem 0 0 0;" id="hint-turnaround"></p>
+              </div>
+              <div id="tab-reg-logistics-sponsor-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="tab-reg-usage-rights" style="width: 16px; height: 16px; accent-color: var(--accent-gold);">
+                  <label for="tab-reg-usage-rights" style="font-size: 0.75rem; font-weight: 600; cursor: pointer;">This campaign requires usage rights to re-run content as paid ads</label>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="tab-reg-exclusivity" style="width: 16px; height: 16px; accent-color: var(--accent-gold);">
+                  <label for="tab-reg-exclusivity" style="font-size: 0.75rem; font-weight: 600; cursor: pointer;">This campaign requires category exclusivity</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION 7 — Content Style & Fit -->
+            <div class="reg-section reg-section-emphasis">
+              <div class="reg-section-head">
+                <span class="reg-section-num">7</span><span class="reg-section-title">Content Style & Fit</span>
+                <span class="reg-section-flag reg-flag-required">Required — analytically subjective fit scoring</span>
+              </div>
+              <div style="margin-bottom: 0.85rem;">
+                <label style="font-size: 0.75rem; font-weight: 600; display: block; margin-bottom: 0.4rem;">Content Tone (select all that apply)</label>
+                <div id="tab-reg-tone-checkboxes" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+              </div>
+              <div style="margin-bottom: 0.85rem;">
+                <label style="font-size: 0.75rem; font-weight: 600; display: block; margin-bottom: 0.4rem;">Values Alignment <span style="font-weight: 400; color: var(--text-muted);">(optional)</span></label>
+                <div id="tab-reg-values-checkboxes" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+              </div>
+              <div style="display: flex; gap: 1.25rem; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 220px;">
+                  <label style="font-size: 0.75rem; font-weight: 600;">Creative Control Preference</label>
+                  <input type="range" id="tab-reg-creative-control" min="1" max="5" value="3" step="1" style="width: 100%; accent-color: var(--accent-gold);" oninput="document.getElementById('creative-control-readout').innerText = this.value">
+                  <div style="display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-muted);">
+                    <span>Tight script / brand guidelines</span>
+                    <span id="creative-control-readout" style="font-weight: 700; color: var(--navy-main);">3</span>
+                    <span>Full creative freedom</span>
+                  </div>
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                  <label style="font-size: 0.75rem; font-weight: 600;">Partnership Length Preference</label>
+                  <select id="tab-reg-partnership-length" class="form-control">
+                    <option value="either" selected>Either / No preference</option>
+                    <option value="one_off">One-off / single campaign</option>
+                    <option value="ongoing">Ongoing / long-term partnership</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION 8 — Optional Match Bonus -->
             <div class="reg-section">
               <div class="reg-section-head">
-                <span class="reg-section-num">6</span><span class="reg-section-title">Optional Match Bonus</span>
+                <span class="reg-section-num">8</span><span class="reg-section-title">Optional Match Bonus</span>
                 <span class="reg-section-flag reg-flag-optional">Never lowers your score</span>
               </div>
               <p style="font-size: 0.7rem; color: var(--text-muted); margin: 0 0 0.6rem 0;">Entirely optional. Leaving this blank never lowers your score — it only adds a small bonus if both sides share an interest.</p>
@@ -868,9 +941,9 @@
               </div>
             </div>
 
-            <!-- SECTION 7 — Bio & Conditions -->
+            <!-- SECTION 9 — Bio & Conditions -->
             <div class="reg-section">
-              <div class="reg-section-head"><span class="reg-section-num">7</span><span class="reg-section-title">Bio & Conditions</span></div>
+              <div class="reg-section-head"><span class="reg-section-num">9</span><span class="reg-section-title">Bio & Conditions</span></div>
               <div style="margin-bottom: 0.85rem;">
                 <label style="font-size: 0.75rem; font-weight: 600;" id="label-bio-intent">Bio, Intents & Campaign Goals</label>
                 <textarea id="tab-reg-bio" class="form-control" rows="3" placeholder="Describe who you are, conditions, and core intents..." oninput="updateBioCounter()"></textarea>
@@ -882,9 +955,9 @@
               </div>
             </div>
 
-            <!-- SECTION 8 — Privacy -->
+            <!-- SECTION 10 — Privacy -->
             <div class="reg-section">
-              <div class="reg-section-head"><span class="reg-section-num">8</span><span class="reg-section-title">Privacy</span></div>
+              <div class="reg-section-head"><span class="reg-section-num">10</span><span class="reg-section-title">Privacy</span></div>
               <div id="tab-reg-anonymity-group" style="display: flex; align-items: center; gap: 10px;">
                 <input type="checkbox" id="tab-reg-anonymous" style="width: 16px; height: 16px; accent-color: var(--accent-gold);">
                 <label for="tab-reg-anonymous" style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); cursor: pointer;">Keep my identity anonymous in public browsing (name/contact hidden until a pitch is accepted)</label>
@@ -1380,6 +1453,10 @@
     const PRESET_GENRES = ['Fitness & Wellness', 'Beauty & Fashion', 'Tech & SaaS', 'Food & Beverage', 'Finance & Fintech', 'Travel & Lifestyle', 'Gaming & Esports', 'Education', 'E-commerce', 'Parenting & Family', 'Comedy & Entertainment', 'Other'];
     const PRESET_PLATFORMS = ['Instagram', 'YouTube', 'TikTok', 'LinkedIn', 'Twitter/X', 'Podcast', 'Blog', 'Twitch', 'Facebook'];
     const PRESET_LANGUAGES = ['English', 'Hindi', 'Tamil', 'Telugu', 'Bengali', 'Marathi', 'Gujarati', 'Kannada', 'Malayalam', 'Punjabi', 'Other'];
+    const PRESET_COLLAB_TYPES = ['Sponsored Post', 'Product Review', 'Ambassadorship', 'Affiliate/Commission', 'Event Coverage', 'Giveaway', 'UGC / Whitelisted Ad', 'Brand Integration'];
+    const PRESET_CONTENT_FORMATS = ['Reels/Shorts', 'Long-form Video', 'Livestream', 'Static Post', 'Story', 'Blog/Newsletter', 'Podcast'];
+    const PRESET_TONES = ['Comedic', 'Educational', 'Luxury/Aspirational', 'Raw/Authentic', 'Professional', 'Edgy', 'Wholesome'];
+    const PRESET_VALUES = ['Sustainability', 'Social Impact', 'Family-Friendly', 'LGBTQ+ Inclusive', 'Faith-Based', 'Political-Neutral'];
 
     function updateBioCounter() {
       const bio = document.getElementById('tab-reg-bio');
@@ -1413,6 +1490,43 @@
         languagesContainer.innerHTML = PRESET_LANGUAGES.map(l => `
           <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.75rem; background:#F1F5F9; padding:0.35rem 0.6rem; border-radius:6px; cursor:pointer;">
             <input type="checkbox" class="language-checkbox" value="${l}" style="width:14px; height:14px;"> ${l}
+          </label>
+        `).join('');
+      }
+
+      // --- New (Sept 2026): collab type / format / tone / values checkbox groups ---
+      const collabContainer = document.getElementById('tab-reg-collab-checkboxes');
+      if (collabContainer) {
+        collabContainer.innerHTML = PRESET_COLLAB_TYPES.map(c => `
+          <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.75rem; background:#F1F5F9; padding:0.35rem 0.6rem; border-radius:6px; cursor:pointer;">
+            <input type="checkbox" class="collab-type-checkbox" value="${c}" style="width:14px; height:14px;"> ${c}
+          </label>
+        `).join('');
+      }
+
+      const formatContainer = document.getElementById('tab-reg-format-checkboxes');
+      if (formatContainer) {
+        formatContainer.innerHTML = PRESET_CONTENT_FORMATS.map(f => `
+          <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.75rem; background:#F1F5F9; padding:0.35rem 0.6rem; border-radius:6px; cursor:pointer;">
+            <input type="checkbox" class="format-checkbox" value="${f}" style="width:14px; height:14px;"> ${f}
+          </label>
+        `).join('');
+      }
+
+      const toneContainer = document.getElementById('tab-reg-tone-checkboxes');
+      if (toneContainer) {
+        toneContainer.innerHTML = PRESET_TONES.map(t => `
+          <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.75rem; background:#F1F5F9; padding:0.35rem 0.6rem; border-radius:6px; cursor:pointer;">
+            <input type="checkbox" class="tone-checkbox" value="${t}" style="width:14px; height:14px;"> ${t}
+          </label>
+        `).join('');
+      }
+
+      const valuesContainer = document.getElementById('tab-reg-values-checkboxes');
+      if (valuesContainer) {
+        valuesContainer.innerHTML = PRESET_VALUES.map(v => `
+          <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.75rem; background:#F1F5F9; padding:0.35rem 0.6rem; border-radius:6px; cursor:pointer;">
+            <input type="checkbox" class="values-checkbox" value="${v}" style="width:14px; height:14px;"> ${v}
           </label>
         `).join('');
       }
@@ -1779,6 +1893,10 @@
       const brandSafetyGroup = document.getElementById('tab-reg-brand-safety-group');
       const audienceInput = document.getElementById('tab-reg-audience');
       const engagementInput = document.getElementById('tab-reg-engagement');
+      const lblTurnaround = document.getElementById('label-turnaround');
+      const turnaroundInput = document.getElementById('tab-reg-turnaround');
+      const hintTurnaround = document.getElementById('hint-turnaround');
+      const logisticsSponsorGroup = document.getElementById('tab-reg-logistics-sponsor-group');
 
       if (role === 'sponsor') {
         heading.innerText = "Company Listing / Post Record";
@@ -1802,6 +1920,10 @@
         engagementInput.placeholder = "e.g., 3.0 — leave blank for no minimum";
         hintEngagement.innerText = "The lowest engagement rate you require from a creator. Leave blank if you have no minimum.";
         brandSafetyGroup.style.display = 'block';
+        lblTurnaround.innerText = "Max Acceptable Turnaround (days, optional)";
+        turnaroundInput.placeholder = "e.g., 14 — leave blank for no requirement";
+        hintTurnaround.innerText = "The slowest turnaround you'll accept from a creator. Leave blank if you have no requirement.";
+        logisticsSponsorGroup.style.display = 'flex';
       } else {
         heading.innerText = "Influencer Listing / Post Record";
         sub.innerText = "Publish your rates, mandatory genre, stats, and bio so sponsors can discover you.";
@@ -1818,6 +1940,10 @@
         engagementInput.placeholder = "3.5";
         hintEngagement.innerText = "Your real average engagement rate — used to match against sponsor minimums.";
         brandSafetyGroup.style.display = 'none';
+        lblTurnaround.innerText = "Your Typical Turnaround (days)";
+        turnaroundInput.placeholder = "e.g., 5";
+        hintTurnaround.innerText = "How long deliverables usually take you, in days — matched against a sponsor's max acceptable turnaround.";
+        logisticsSponsorGroup.style.display = 'none';
       }
     }
 
@@ -1918,6 +2044,16 @@
       const interests = interestsRaw ? interestsRaw.split(',').map(s => sanitizeHTML(s.trim())).filter(s => s) : [];
       const hideLocation = document.getElementById('tab-reg-hide-location').checked;
 
+      const collabTypes = Array.from(document.querySelectorAll('.collab-type-checkbox:checked')).map(cb => cb.value);
+      const contentFormats = Array.from(document.querySelectorAll('.format-checkbox:checked')).map(cb => cb.value);
+      const contentTone = Array.from(document.querySelectorAll('.tone-checkbox:checked')).map(cb => cb.value);
+      const valuesTags = Array.from(document.querySelectorAll('.values-checkbox:checked')).map(cb => cb.value);
+      const turnaroundDays = parseInt(document.getElementById('tab-reg-turnaround').value) || 0;
+      const usageRightsRequired = document.getElementById('tab-reg-usage-rights')?.checked || false;
+      const exclusivityRequired = document.getElementById('tab-reg-exclusivity')?.checked || false;
+      const creativeControlPref = parseInt(document.getElementById('tab-reg-creative-control').value) || 3;
+      const partnershipLengthPref = document.getElementById('tab-reg-partnership-length').value;
+
       if (!name || !industry || !stats) {
         alert("Mandatory validation error: Name, Industry/Genre, and Stats fields cannot be empty when filing a listing.");
         return;
@@ -1947,6 +2083,18 @@
       }
       if (contentLanguages.length === 0) {
         alert("At least one content language is mandatory.");
+        return;
+      }
+      if (collabTypes.length === 0) {
+        alert("At least one collaboration type is mandatory — this powers the collab-format compatibility score.");
+        return;
+      }
+      if (contentFormats.length === 0) {
+        alert("At least one content format is mandatory — this powers the collab-format compatibility score.");
+        return;
+      }
+      if (contentTone.length === 0) {
+        alert("At least one content tone is mandatory — this powers the tone & values compatibility score.");
         return;
       }
 
@@ -2005,7 +2153,16 @@
             interests: interests,
             hide_location_publicly: hideLocation,
             excluded_niches: excludedNiches,
-            requires_local_presence: requiresLocalPresence
+            requires_local_presence: requiresLocalPresence,
+            collab_types: collabTypes,
+            content_formats: contentFormats,
+            turnaround_days: turnaroundDays,
+            usage_rights_required: usageRightsRequired,
+            exclusivity_required: exclusivityRequired,
+            content_tone: contentTone,
+            values_tags: valuesTags,
+            creative_control_pref: creativeControlPref,
+            partnership_length_pref: partnershipLengthPref
           })
         });
         if (!res.ok) {

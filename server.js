@@ -80,6 +80,104 @@ app.get('/privacy', (req, res) => {
   res.sendFile(path.join(__dirname, 'privacy.html'));
 });
 
+// --- SEO: robots.txt, sitemap.xml, llms.txt ---
+// robots.txt explicitly allows every major search-engine crawler AND the AI answer-engine
+// crawlers (GPTBot, ChatGPT-User, ClaudeBot, PerplexityBot, Google-Extended, etc.) — these
+// don't always inherit a bare "User-agent: *" allow the way search crawlers do, and some
+// sites accidentally block them without realizing it, which is the single most common reason
+// a site never shows up in AI-generated summaries at all.
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain').send(
+`User-agent: *
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+Sitemap: https://www.contactsocia.com/sitemap.xml`
+  );
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  res.type('application/xml').send(
+`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://www.contactsocia.com/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://www.contactsocia.com/terms</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.contactsocia.com/privacy</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+</urlset>`
+  );
+});
+
+// llms.txt: an emerging convention some AI crawlers and agent tools check for a clean,
+// plain-text summary of a site, separate from the rendered HTML. Not a guarantee any given
+// AI product reads it, but it's a free, low-risk signal to provide.
+app.get('/llms.txt', (req, res) => {
+  res.type('text/plain').send(
+`# SOCIA Protocol
+
+> SOCIA Protocol is an escrow-based marketplace that matches sponsors and influencers using an algorithmic compatibility engine, holding every payment in escrow until deliverables are approved.
+
+SOCIA Protocol lets brands (sponsors) and influencers/content creators post listings, get algorithmically matched on niche, budget, audience size and engagement, platform overlap, brand safety, collaboration type and content format, content tone and values alignment, creative-control fit, turnaround time, and each account's real track record on SOCIA. Once a deal is agreed, the sponsor's payment is held in escrow and released to the influencer only after deliverables are approved.
+
+## Key facts
+- Free to create an account and publish a listing.
+- Platform takes a small fee on escrow-settled deals; an optional paid "Sovereign Pass" subscription tier exists.
+- Payments are protected by escrow — funds release only after deliverable approval.
+- Matching is algorithmic, not manual browsing.
+
+## Pages
+- Homepage / app: https://www.contactsocia.com/
+- Terms of Service: https://www.contactsocia.com/terms
+- Privacy Policy: https://www.contactsocia.com/privacy`
+  );
+});
+
 app.use(express.static(path.join(__dirname), { index: false }));
 
 app.get('*', (req, res) => {

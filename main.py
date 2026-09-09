@@ -126,6 +126,17 @@ class UserAccount(SQLModel, table=True):
     subscription_expires_at: Optional[datetime] = Field(default=None)
     razorpay_account_active: bool = Field(default=False)
     payout_account_linked_at: Optional[datetime] = Field(default=None)  # tracks when the CURRENT payout account was linked, for the cooldown check
+    # --- New (Sept 2026): account-level identity + experience data collection ---
+    # Lives on the account rather than per-listing because it doesn't change deal-to-deal.
+    # Handles are self-reported for now (not yet pulled live from each platform's API) — shown
+    # on the profile as a disclosed, unverified link so sponsors/creators can cross-check
+    # manually; a "socials_verified" admin flip is the natural next step once OAuth handshakes
+    # with Instagram/YouTube/TikTok are wired in.
+    instagram_handle: str = Field(default="")
+    youtube_handle: str = Field(default="")
+    tiktok_handle: str = Field(default="")
+    years_active: int = Field(default=0)  # years creating content / running sponsorship campaigns — self-reported experience signal
+    company_size: str = Field(default="")  # sponsors only, self-reported bucket: "Solo","2-10","11-50","51-200","200+"
 
 class MarketplaceListing(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -169,6 +180,23 @@ class MarketplaceListing(SQLModel, table=True):
     excluded_niches: str = Field(default="")  # comma-separated niches a SPONSOR won't be associated with (e.g. "gambling,alcohol")
     requires_local_presence: bool = Field(default=False)  # sponsor flag: this campaign needs an in-market/local creator, so location should count
     created_at: datetime = Field(default_factory=datetime.utcnow)  # for growth/trend analytics; backfilled to epoch-ish default on old rows via migration
+    # --- New (Sept 2026): compulsory objective deal-shape fields ---
+    # Both roles fill these the same way niche_tags works: a sponsor states what it wants,
+    # a creator states what it does, and the algorithm scores the overlap.
+    collab_types: str = Field(default="")  # comma-separated: "Sponsored Post,Product Review,Ambassadorship,Affiliate,Event Coverage,Giveaway"
+    content_formats: str = Field(default="")  # comma-separated: "Reels/Shorts,Long-form Video,Livestream,Static Post,Story,Blog/Newsletter,Podcast"
+    # Mirrors the audience_size/engagement_rate sponsor-requirement-vs-creator-actual pattern:
+    # sponsor = max acceptable turnaround in days (0 = no requirement); creator = their real typical turnaround.
+    turnaround_days: int = Field(default=0)
+    usage_rights_required: bool = Field(default=False)  # sponsor-declared deal term: wants rights to reuse content in paid ads
+    exclusivity_required: bool = Field(default=False)  # sponsor-declared deal term: wants category exclusivity for the campaign window
+    # --- New (Sept 2026): compulsory "analytically subjective" fit fields ---
+    # These aren't pass/fail facts — they're compatibility signals scored by closeness/overlap,
+    # not by correctness, exactly like brand-safety scores a conflict rather than a right answer.
+    content_tone: str = Field(default="")  # comma-separated subjective tags: "Comedic,Educational,Luxury,Raw/Authentic,Professional,Edgy,Wholesome"
+    values_tags: str = Field(default="")  # comma-separated, optional: "Sustainability,Social Impact,Family-Friendly,Faith-Based,Political-Neutral"
+    creative_control_pref: int = Field(default=3)  # 1 (wants a tight script/brand guidelines) .. 5 (wants full creative freedom)
+    partnership_length_pref: str = Field(default="either")  # "one_off" | "ongoing" | "either"
 
 class DealLedgerRecord(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -296,6 +324,22 @@ def migrate_schema():
         "ALTER TABLE marketplacelisting ADD COLUMN excluded_niches VARCHAR DEFAULT ''",
         "ALTER TABLE marketplacelisting ADD COLUMN requires_local_presence BOOLEAN DEFAULT FALSE",
         "ALTER TABLE marketplacelisting ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "ALTER TABLE marketplacelisting ADD COLUMN collab_types VARCHAR DEFAULT ''",
+        "ALTER TABLE marketplacelisting ADD COLUMN content_formats VARCHAR DEFAULT ''",
+        "ALTER TABLE marketplacelisting ADD COLUMN turnaround_days INTEGER DEFAULT 0",
+        "ALTER TABLE marketplacelisting ADD COLUMN usage_rights_required BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE marketplacelisting ADD COLUMN exclusivity_required BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE marketplacelisting ADD COLUMN content_tone VARCHAR DEFAULT ''",
+        "ALTER TABLE marketplacelisting ADD COLUMN values_tags VARCHAR DEFAULT ''",
+        "ALTER TABLE marketplacelisting ADD COLUMN creative_control_pref INTEGER DEFAULT 3",
+        "ALTER TABLE marketplacelisting ADD COLUMN partnership_length_pref VARCHAR DEFAULT 'either'",
+        # --- Account-level data collection (Sept 2026): identity + experience signals live on
+        # the account, not per-listing, since they don't change deal-to-deal. ---
+        "ALTER TABLE useraccount ADD COLUMN instagram_handle VARCHAR DEFAULT ''",
+        "ALTER TABLE useraccount ADD COLUMN youtube_handle VARCHAR DEFAULT ''",
+        "ALTER TABLE useraccount ADD COLUMN tiktok_handle VARCHAR DEFAULT ''",
+        "ALTER TABLE useraccount ADD COLUMN years_active INTEGER DEFAULT 0",
+        "ALTER TABLE useraccount ADD COLUMN company_size VARCHAR DEFAULT ''",
     ]
     with engine.connect() as conn:
         for stmt in migrations:
@@ -400,17 +444,46 @@ def get_current_user_optional(authorization: Optional[str] = Header(None), sessi
 # a small verified-listing trust bonus (now meaningful now that "verified" isn't auto-True —
 # see MarketplaceListing.verified), and symmetric Jaccard overlap (intersection/union) in
 # place of v1's viewer-only-denominator overlap for niches/platforms/languages.
+#
+# v3 (Sept 2026) adds four more factors so the algorithm isn't just "does the money and the
+# niche line up" — it also weighs the SHAPE of the deal and the STYLE fit, which is what
+# actually determines whether a matched pair closes a deal in practice:
+#
+#   5. COLLAB FORMAT: niche overlap says two parties are in the same category, but says
+#      nothing about whether a sponsor wants a paid ambassadorship and the creator only does
+#      one-off product reviews. collab_format scores overlap on deal TYPE (collab_types) and
+#      content FORMAT (content_formats) the same Jaccard way niche does.
+#
+#   6. TONE & VALUES: two "analytically subjective" signals — content tone (comedic vs.
+#      luxury vs. educational, etc.) and values alignment (sustainability, family-friendly,
+#      etc.) — scored by overlap rather than correctness, exactly like brand_safety scores a
+#      conflict rather than a right answer. A sponsor and creator can both be "Fitness" and
+#      still be a bad fit if one is deadpan-luxury and the other is loud-comedic.
+#
+#   7. CREATIVE FIT: creative_control_pref (1=tight script .. 5=full creative freedom) is
+#      scored by CLOSENESS, not overlap — a sponsor wanting heavy script control paired with a
+#      creator who only accepts full creative freedom is a real friction point even though
+#      neither side did anything "wrong". partnership_length_pref (one-off vs. ongoing vs.
+#      either) folds into the same factor as a compatibility check.
+#
+#   8. LOGISTICS: turnaround_days reuses the audience_size pattern — sponsor states the
+#      slowest turnaround they'll accept, creator states their real typical turnaround — plus
+#      usage_rights_required / exclusivity_required are surfaced as disclosed deal terms.
 
 WEIGHTS = {
-    "niche": 22,
-    "budget": 20,
-    "audience_engagement": 15,
-    "reliability": 15,
-    "platforms": 8,
-    "brand_safety": 8,
-    "languages": 5,
-    "location": 4,
-    "verified": 3,
+    "niche": 17,
+    "budget": 15,
+    "audience_engagement": 12,
+    "reliability": 11,
+    "collab_format": 8,
+    "tone_values": 7,
+    "platforms": 6,
+    "brand_safety": 6,
+    "creative_fit": 5,
+    "languages": 4,
+    "logistics": 4,
+    "location": 3,
+    "verified": 2,
 }  # sums to 100 — see compute_match_breakdown for which factors apply to a given pair
 
 REASON_LABELS = {
@@ -418,9 +491,13 @@ REASON_LABELS = {
     "budget": "Budget and rate expectations align",
     "audience_engagement": "Meets audience & engagement requirements",
     "reliability": "Proven track record on SOCIA",
+    "collab_format": "Aligned on collaboration type & content format",
+    "tone_values": "Shared content tone & values",
     "platforms": "Active on the same platforms",
     "brand_safety": "No brand-safety conflicts",
+    "creative_fit": "Compatible creative control & partnership style",
     "languages": "Shares content language(s)",
+    "logistics": "Turnaround expectations align",
     "location": "Located in the required market",
     "verified": "SOCIA-verified listing",
 }
@@ -581,6 +658,23 @@ def compute_match_breakdown(
     earned += pts
     factors["reliability"] = {"weight": w, "earned": pts, "applicable": True}
 
+    # --- Collab format: deal-type overlap (collab_types) averaged with content-format overlap ---
+    w = WEIGHTS["collab_format"]
+    v_collab, c_collab = _tagset(viewer_listing.collab_types), _tagset(candidate.collab_types)
+    v_fmt, c_fmt = _tagset(viewer_listing.content_formats), _tagset(candidate.content_formats)
+    sub_scores = []
+    if v_collab and c_collab:
+        sub_scores.append(_jaccard(v_collab, c_collab))
+    if v_fmt and c_fmt:
+        sub_scores.append(_jaccard(v_fmt, c_fmt))
+    if sub_scores:
+        applicable_weight += w
+        pts = (sum(sub_scores) / len(sub_scores)) * w
+        earned += pts
+        factors["collab_format"] = {"weight": w, "earned": pts, "applicable": True}
+    else:
+        factors["collab_format"] = {"weight": w, "earned": 0.0, "applicable": False}
+
     # --- Platform overlap ---
     viewer_platforms, candidate_platforms = _tagset(viewer_listing.platforms), _tagset(candidate.platforms)
     if viewer_platforms and candidate_platforms:
@@ -602,6 +696,60 @@ def compute_match_breakdown(
         factors["brand_safety"] = {"weight": w, "earned": pts, "applicable": True, "conflict": conflict}
     else:
         factors["brand_safety"] = {"weight": w, "earned": 0.0, "applicable": False}
+
+    # --- Tone & values: "analytically subjective" fit — scored by overlap, not correctness ---
+    w = WEIGHTS["tone_values"]
+    v_tone, c_tone = _tagset(viewer_listing.content_tone), _tagset(candidate.content_tone)
+    v_values, c_values = _tagset(viewer_listing.values_tags), _tagset(candidate.values_tags)
+    sub_scores = []
+    if v_tone and c_tone:
+        sub_scores.append(_jaccard(v_tone, c_tone))
+    if v_values and c_values:
+        sub_scores.append(_jaccard(v_values, c_values))
+    if sub_scores:
+        applicable_weight += w
+        pts = (sum(sub_scores) / len(sub_scores)) * w
+        earned += pts
+        factors["tone_values"] = {"weight": w, "earned": pts, "applicable": True}
+    else:
+        factors["tone_values"] = {"weight": w, "earned": 0.0, "applicable": False}
+
+    # --- Creative fit: closeness (not overlap) on creative-control preference, plus a
+    # partnership-length compatibility check. Both fields are compulsory at listing creation,
+    # so this is always applicable for a real sponsor/creator pair. ---
+    w = WEIGHTS["creative_fit"]
+    if sponsor and creator:
+        applicable_weight += w
+        control_closeness = 1 - (abs(sponsor.creative_control_pref - creator.creative_control_pref) / 4)
+        v_pref, c_pref = viewer_listing.partnership_length_pref, candidate.partnership_length_pref
+        if v_pref == "either" or c_pref == "either" or v_pref == c_pref:
+            length_fit = 1.0
+        else:
+            length_fit = 0.3  # one-off vs. ongoing mismatch — a soft friction point, not a hard conflict
+        pts = (control_closeness * 0.6 + length_fit * 0.4) * w
+        earned += pts
+        factors["creative_fit"] = {"weight": w, "earned": pts, "applicable": True}
+    else:
+        factors["creative_fit"] = {"weight": w, "earned": 0.0, "applicable": False}
+
+    # --- Logistics: turnaround compatibility (sponsor's max acceptable vs. creator's real
+    # typical turnaround — same requirement-vs-actual pattern as audience_engagement).
+    # usage_rights_required / exclusivity_required are disclosed deal terms, surfaced to the
+    # user rather than scored, since there's no creator-side counter-field to compare against yet. ---
+    w = WEIGHTS["logistics"]
+    if sponsor and creator:
+        sponsor_max_days = sponsor.turnaround_days
+        creator_days = creator.turnaround_days
+        if sponsor_max_days > 0 and creator_days > 0:
+            applicable_weight += w
+            fraction = 1.0 if creator_days <= sponsor_max_days else max(0.0, 1 - (creator_days - sponsor_max_days) / sponsor_max_days)
+            pts = fraction * w
+            earned += pts
+            factors["logistics"] = {"weight": w, "earned": pts, "applicable": True}
+        else:
+            factors["logistics"] = {"weight": w, "earned": 0.0, "applicable": False}
+    else:
+        factors["logistics"] = {"weight": w, "earned": 0.0, "applicable": False}
 
     # --- Content language overlap ---
     viewer_langs, candidate_langs = _tagset(viewer_listing.content_languages), _tagset(candidate.content_languages)
@@ -825,6 +973,11 @@ class UserSettingsUpdate(BaseModel):
     phone_number: Optional[str] = None
     industry: Optional[str] = None
     notification_preferences: Optional[str] = None
+    instagram_handle: Optional[str] = None
+    youtube_handle: Optional[str] = None
+    tiktok_handle: Optional[str] = None
+    years_active: Optional[int] = None
+    company_size: Optional[str] = None
 
 class ListingCreate(BaseModel):
     name: str
@@ -847,6 +1000,15 @@ class ListingCreate(BaseModel):
     hide_location_publicly: bool = False
     excluded_niches: List[str] = []
     requires_local_presence: bool = False
+    collab_types: List[str] = []
+    content_formats: List[str] = []
+    turnaround_days: int = 0
+    usage_rights_required: bool = False
+    exclusivity_required: bool = False
+    content_tone: List[str] = []
+    values_tags: List[str] = []
+    creative_control_pref: int = 3
+    partnership_length_pref: str = "either"
 
 class DealSimulationRequest(BaseModel):
     sponsor_contact: str
@@ -1059,7 +1221,12 @@ def get_account_settings(current_user: UserAccount = Depends(get_current_user)):
             "company_name": user.company_name,
             "phone_number": user.phone_number,
             "industry": user.industry,
-            "notification_preferences": user.notification_preferences
+            "notification_preferences": user.notification_preferences,
+            "instagram_handle": user.instagram_handle,
+            "youtube_handle": user.youtube_handle,
+            "tiktok_handle": user.tiktok_handle,
+            "years_active": user.years_active,
+            "company_size": user.company_size
         }
     }
 
@@ -1085,7 +1252,17 @@ def update_account_settings(payload: UserSettingsUpdate, session: Session = Depe
         user.industry = payload.industry
     if payload.notification_preferences is not None:
         user.notification_preferences = payload.notification_preferences
-        
+    if payload.instagram_handle is not None:
+        user.instagram_handle = payload.instagram_handle
+    if payload.youtube_handle is not None:
+        user.youtube_handle = payload.youtube_handle
+    if payload.tiktok_handle is not None:
+        user.tiktok_handle = payload.tiktok_handle
+    if payload.years_active is not None:
+        user.years_active = payload.years_active
+    if payload.company_size is not None:
+        user.company_size = payload.company_size
+
     session.add(user)
     session.commit()
     session.refresh(user)
@@ -1163,6 +1340,16 @@ def create_listing(payload: ListingCreate, session: Session = Depends(get_sessio
         raise HTTPException(status_code=400, detail="At least one platform is required.")
     if not payload.content_languages or not any(l.strip() for l in payload.content_languages):
         raise HTTPException(status_code=400, detail="At least one content language is required.")
+    if not payload.collab_types or not any(t.strip() for t in payload.collab_types):
+        raise HTTPException(status_code=400, detail="At least one collaboration type is required.")
+    if not payload.content_formats or not any(t.strip() for t in payload.content_formats):
+        raise HTTPException(status_code=400, detail="At least one content format is required.")
+    if not payload.content_tone or not any(t.strip() for t in payload.content_tone):
+        raise HTTPException(status_code=400, detail="At least one content tone is required.")
+    if payload.partnership_length_pref not in ("one_off", "ongoing", "either"):
+        raise HTTPException(status_code=400, detail="Invalid partnership length preference.")
+    if not (1 <= payload.creative_control_pref <= 5):
+        raise HTTPException(status_code=400, detail="Creative control preference must be between 1 and 5.")
 
     cond_str = ", ".join(payload.pre_conditions)
     niche_str = ", ".join(t.strip() for t in payload.niche_tags if t.strip())
@@ -1170,6 +1357,10 @@ def create_listing(payload: ListingCreate, session: Session = Depends(get_sessio
     platforms_str = ", ".join(p.strip() for p in payload.platforms if p.strip())
     languages_str = ", ".join(l.strip() for l in payload.content_languages if l.strip())
     excluded_niches_str = ", ".join(t.strip() for t in payload.excluded_niches if t.strip())
+    collab_types_str = ", ".join(t.strip() for t in payload.collab_types if t.strip())
+    content_formats_str = ", ".join(t.strip() for t in payload.content_formats if t.strip())
+    content_tone_str = ", ".join(t.strip() for t in payload.content_tone if t.strip())
+    values_tags_str = ", ".join(t.strip() for t in payload.values_tags if t.strip())
     listing = MarketplaceListing(
         contact=current_user.email,
         name=payload.name,
@@ -1192,6 +1383,15 @@ def create_listing(payload: ListingCreate, session: Session = Depends(get_sessio
         hide_location_publicly=payload.hide_location_publicly,
         excluded_niches=excluded_niches_str,
         requires_local_presence=payload.requires_local_presence,
+        collab_types=collab_types_str,
+        content_formats=content_formats_str,
+        turnaround_days=payload.turnaround_days,
+        usage_rights_required=payload.usage_rights_required,
+        exclusivity_required=payload.exclusivity_required,
+        content_tone=content_tone_str,
+        values_tags=values_tags_str,
+        creative_control_pref=payload.creative_control_pref,
+        partnership_length_pref=payload.partnership_length_pref,
         # verified intentionally left at the model default (False) — see MarketplaceListing.verified
     )
     session.add(listing)
@@ -1245,6 +1445,15 @@ def get_marketplace_listings(role: str, session: Session = Depends(get_session),
             "contentLanguages": [t.strip() for t in r.content_languages.split(",") if t.strip()],
             "excludedNiches": [t.strip() for t in r.excluded_niches.split(",") if t.strip()],
             "requiresLocalPresence": r.requires_local_presence,
+            "collabTypes": [t.strip() for t in r.collab_types.split(",") if t.strip()],
+            "contentFormats": [t.strip() for t in r.content_formats.split(",") if t.strip()],
+            "turnaroundDays": r.turnaround_days,
+            "usageRightsRequired": r.usage_rights_required,
+            "exclusivityRequired": r.exclusivity_required,
+            "contentTone": [t.strip() for t in r.content_tone.split(",") if t.strip()],
+            "valuesTags": [t.strip() for t in r.values_tags.split(",") if t.strip()],
+            "creativeControlPref": r.creative_control_pref,
+            "partnershipLengthPref": r.partnership_length_pref,
             "verified": r.verified
         })
     formatted.sort(key=lambda x: (x["match"] is None, -(x["match"] or 0)))
@@ -1788,6 +1997,10 @@ def admin_get_analytics(session: Session = Depends(get_session), _: bool = Depen
     platform_breakdown = _tally(listings, lambda l: l.platforms)
     location_breakdown = _tally(listings, lambda l: l.location)
     language_breakdown = _tally(listings, lambda l: l.content_languages)
+    collab_type_breakdown = _tally(listings, lambda l: l.collab_types)
+    content_format_breakdown = _tally(listings, lambda l: l.content_formats)
+    tone_breakdown = _tally(listings, lambda l: l.content_tone)
+    values_breakdown = _tally(listings, lambda l: l.values_tags)
     budget_distribution = _bucket_budget(listings)
 
     sponsor_listings = [l for l in listings if l.role == "sponsor"]
@@ -1838,6 +2051,10 @@ def admin_get_analytics(session: Session = Depends(get_session), _: bool = Depen
             "platforms": platform_breakdown,
             "location": location_breakdown,
             "content_languages": language_breakdown,
+            "collab_types": collab_type_breakdown,
+            "content_formats": content_format_breakdown,
+            "content_tone": tone_breakdown,
+            "values_tags": values_breakdown,
             "budget_distribution": budget_distribution,
             "reliability": [{"label": k, "count": v} for k, v in reliability_buckets.items()],
         },
