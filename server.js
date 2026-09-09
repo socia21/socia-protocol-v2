@@ -88,9 +88,28 @@ app.get('/privacy', (req, res) => {
 // a site never shows up in AI-generated summaries at all.
 app.get('/robots.txt', (req, res) => {
   res.type('text/plain').send(
-`User-agent: *
+`# SOCIA Protocol — every crawler below is explicitly welcomed, not just left to a bare
+# wildcard. AI answer engines in particular don't always inherit a "User-agent: *" allow the
+# way search crawlers do, so each is named individually — this is the single most common
+# reason a site never gets cited in AI-generated summaries.
+
+User-agent: *
 Allow: /
 
+# --- General search engines ---
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+# --- AI answer-engine / training crawlers ---
 User-agent: GPTBot
 Allow: /
 
@@ -106,6 +125,9 @@ Allow: /
 User-agent: Claude-Web
 Allow: /
 
+User-agent: Claude-SearchBot
+Allow: /
+
 User-agent: anthropic-ai
 Allow: /
 
@@ -118,13 +140,34 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
-User-agent: Bingbot
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: meta-externalagent
+Allow: /
+
+User-agent: FacebookBot
+Allow: /
+
+User-agent: YouBot
+Allow: /
+
+User-agent: DuckAssistBot
+Allow: /
+
+User-agent: cohere-ai
 Allow: /
 
 User-agent: CCBot
 Allow: /
 
-User-agent: Applebot-Extended
+User-agent: Diffbot
+Allow: /
+
+User-agent: Bytespider
 Allow: /
 
 Sitemap: https://www.contactsocia.com/sitemap.xml`
