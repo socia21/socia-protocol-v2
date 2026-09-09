@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SOCIA Protocol — Influencer Marketing Marketplace with Escrow-Protected Payments</title>
   <meta name="description" content="SOCIA Protocol: algorithmic sponsor-influencer matching with escrow-protected payments. Post a listing, get matched, get paid — no unpaid work, ever.">
-  <meta name="keywords" content="SOCIA Protocol, influencer marketing platform, sponsor influencer matching, escrow payments for creators, creator marketplace, brand deals platform, influencer marketplace, algorithmic influencer matching, secure influencer payments">
+  <meta name="keywords" content="SOCIA Protocol, Protocol SOCIA, SOCIA Escrow, influencer marketing platform, sponsor influencer matching, escrow payments for creators, creator marketplace, brand deals platform, influencer marketplace, algorithmic influencer matching, secure influencer payments, influencer payment protection, brand deal escrow, creator economy platform, influencer sponsorship marketplace, pay influencers safely, influencer marketing escrow, sponsor influencer deals, creator brand partnerships, influencer campaign matching, verified influencer marketplace, influencer marketing India, creator monetization platform, influencer contract protection, secure creator payments, influencer marketplace with escrow, sponsor discovery platform, influencer marketing algorithm, creator sponsorship deals, brand creator matchmaking, escrow-based marketplace">
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
   <meta name="author" content="SOCIA Protocol">
   <link rel="canonical" href="https://www.contactsocia.com/">
@@ -46,7 +46,7 @@
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "SOCIA Protocol",
-    "alternateName": "SOCIA",
+    "alternateName": ["SOCIA", "SOCIA Escrow"],
     "url": "https://www.contactsocia.com/",
     "logo": "https://www.contactsocia.com/socia-favicon-512.png",
     "description": "SOCIA Protocol is an escrow-based marketplace that matches sponsors and influencers using an algorithmic compatibility engine, holding every payment in escrow until deliverables are approved."
@@ -131,6 +131,21 @@
         "@type": "Question",
         "name": "What is the SOCIA Protocol Sovereign Pass?",
         "acceptedAnswer": { "@type": "Answer", "text": "Sovereign Pass is SOCIA Protocol's optional paid subscription tier for sponsors, which lowers the platform's commission rate on escrow-settled deals." }
+      },
+      {
+        "@type": "Question",
+        "name": "What is SOCIA Escrow?",
+        "acceptedAnswer": { "@type": "Answer", "text": "SOCIA Escrow is SOCIA Protocol's built-in payment-protection system: once a sponsor and influencer agree on a deal, the sponsor's payment is held in SOCIA Escrow rather than paid directly, and is only released to the influencer once the sponsor approves the completed deliverables." }
+      },
+      {
+        "@type": "Question",
+        "name": "How does SOCIA Protocol protect influencers from unpaid brand deals?",
+        "acceptedAnswer": { "@type": "Answer", "text": "A sponsor's payment is placed in SOCIA Escrow before work begins and can only be released to the influencer, never returned to the sponsor without a dispute process — so an influencer who delivers approved work is guaranteed payment rather than relying on the sponsor's word." }
+      },
+      {
+        "@type": "Question",
+        "name": "Can sponsors find verified influencers on SOCIA Protocol?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Influencer listings can carry a SOCIA-verified badge once SOCIA reviews them, and every listing shows a reliability score built from that account's real track record of completed versus disputed escrow deals on the platform." }
       }
     ]
   }
@@ -619,6 +634,11 @@
     
     .settings-panel { display: none; }
     .settings-panel.active { display: flex; flex-direction: column; gap: 1rem; }
+    .settings-section-label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--navy-main); margin-top: 0.4rem; border-top: 1px solid #E2E8F0; padding-top: 0.75rem; }
+    .settings-sublabel { font-size: 0.7rem; color: var(--text-muted); margin: -0.5rem 0 0 0; }
+    .settings-label { font-size: 0.75rem; font-weight: 600; color: var(--navy-main); display: block; margin-bottom: 0.2rem; }
+    .checkbox-row { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; font-size: 0.74rem; }
+    .checkbox-row label { display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
     /* ============================================================
        MOBILE OPTIMIZATION — applies at 768px and below (phones/small tablets)
        ============================================================ */
@@ -722,6 +742,30 @@
       .gateway-logo-mark { height: 88px; }
       .header-right span { font-size: 0.7rem; }
       .modal-content { padding: 1rem; }
+    }
+
+    /* --- Deliverable requirements & compliance (Negotiations sidebar) --- */
+    .req-panel { border: 1px solid #E2E8F0; border-radius: var(--radius-sm); margin-top: 0.75rem; overflow: hidden; }
+    .req-panel > summary { padding: 0.6rem 0.75rem; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; cursor: pointer; background: var(--off-white); color: var(--navy-main); list-style: none; }
+    .req-panel > summary::-webkit-details-marker { display: none; }
+    .req-panel > summary::before { content: '▸ '; }
+    .req-panel[open] > summary::before { content: '▾ '; }
+    .req-panel-body { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.6rem; }
+    .req-item { background: var(--off-white); border: 1px solid #E2E8F0; border-radius: var(--radius-sm); padding: 0.55rem 0.7rem; font-size: 0.74rem; }
+    .req-item.met { border-left: 3px solid var(--trust-green); }
+    .req-item.unmet { border-left: 3px solid var(--danger-red, #DC2626); }
+    .req-item-label { font-weight: 700; color: var(--navy-darkest); }
+    .req-item-meta { color: var(--text-muted); font-size: 0.68rem; margin-top: 0.15rem; }
+    .compliance-bar-track { background: #E2E8F0; border-radius: 20px; height: 8px; overflow: hidden; margin: 0.4rem 0; }
+    .compliance-bar-fill { background: var(--trust-green); height: 100%; transition: width 0.3s ease; }
+    .invoice-table { width: 100%; font-size: 0.8rem; border-collapse: collapse; }
+    .invoice-table td { padding: 0.5rem 0; border-bottom: 1px solid #E2E8F0; }
+
+    @media print {
+      body * { visibility: hidden; }
+      #modal-invoice, #modal-invoice * { visibility: visible; }
+      #modal-invoice { position: absolute; top: 0; left: 0; width: 100%; background: white; }
+      #modal-invoice .modal-header .close-btn, #modal-invoice > .modal-content > div:last-child { display: none; }
     }
   </style>
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
@@ -871,7 +915,7 @@
       <section class="seo-section">
         <span class="seo-eyebrow">What Is SOCIA Protocol</span>
         <h2 class="seo-heading">An influencer marketing marketplace with escrow-protected payments</h2>
-        <p class="seo-lede">No unpaid work. No ghosted invoices. SOCIA Protocol matches sponsors and influencers for paid promotional deals with an algorithmic compatibility engine that scores niche, budget, audience and engagement, platform overlap, content format and tone, creative fit, and each account's real track record on SOCIA — then holds every payment in escrow and releases it only once deliverables are approved.</p>
+        <p class="seo-lede">No unpaid work. No ghosted invoices. SOCIA Protocol matches sponsors and influencers for paid promotional deals with an algorithmic compatibility engine that scores niche, budget, audience and engagement, platform overlap, content format and tone, creative fit, and each account's real track record on SOCIA — then holds every payment in SOCIA Escrow, releasing it only once deliverables are approved.</p>
       </section>
 
       <section class="seo-section">
@@ -923,6 +967,18 @@
         <details class="faq-item">
           <summary>What is the SOCIA Protocol Sovereign Pass?</summary>
           <p>Sovereign Pass is SOCIA Protocol's optional paid subscription tier for sponsors, which lowers the platform's commission rate on escrow-settled deals.</p>
+        </details>
+        <details class="faq-item">
+          <summary>What is SOCIA Escrow?</summary>
+          <p>SOCIA Escrow is SOCIA Protocol's built-in payment-protection system: once a sponsor and influencer agree on a deal, the sponsor's payment is held in SOCIA Escrow rather than paid directly, and is only released to the influencer once the sponsor approves the completed deliverables.</p>
+        </details>
+        <details class="faq-item">
+          <summary>How does SOCIA Protocol protect influencers from unpaid brand deals?</summary>
+          <p>A sponsor's payment is placed in SOCIA Escrow before work begins and can only be released to the influencer, never returned to the sponsor without a dispute process — so an influencer who delivers approved work is guaranteed payment rather than relying on the sponsor's word.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Can sponsors find verified influencers on SOCIA Protocol?</summary>
+          <p>Yes. Influencer listings can carry a SOCIA-verified badge once SOCIA reviews them, and every listing shows a reliability score built from that account's real track record of completed versus disputed escrow deals on the platform.</p>
         </details>
       </section>
 
@@ -1263,6 +1319,61 @@
               </div>
 
               <div id="negotiation-conditions-list" style="display: flex; flex-direction: column; gap: 0.55rem; margin-top: 0.75rem;"></div>
+
+              <!-- OBJECTIVE DELIVERABLE COMPLIANCE ENGINE -->
+              <div id="compliance-summary-box" style="display:none; font-size: 0.72rem; color: var(--navy-surface); margin-top: 0.5rem;">
+                <div style="display:flex; justify-content:space-between;"><span>Objective compliance</span><strong id="compliance-summary-pct">100%</strong></div>
+                <div class="compliance-bar-track"><div class="compliance-bar-fill" id="compliance-summary-fill" style="width:100%;"></div></div>
+                <div id="compliance-summary-note" style="color: var(--text-muted); font-size: 0.68rem;"></div>
+              </div>
+
+              <details class="req-panel">
+                <summary>Objective Deliverable Requirements</summary>
+                <div class="req-panel-body">
+                  <p style="font-size: 0.68rem; color: var(--text-muted); margin: 0;">Facts, not opinions — a platform, a hashtag, a date, a count. Adding or removing a requirement resets both locks.</p>
+                  <select id="new-req-category" class="form-control" style="font-size: 0.75rem;">
+                    <option value="platform">Platform</option>
+                    <option value="content_format">Content format</option>
+                    <option value="post_count">Post count</option>
+                    <option value="hashtag">Hashtag</option>
+                    <option value="mention">Mention</option>
+                    <option value="link">Link / UTM</option>
+                    <option value="deadline">Deadline (ISO date)</option>
+                    <option value="content_approval">Pre-approval required</option>
+                    <option value="usage_rights">Usage rights</option>
+                    <option value="exclusivity">Exclusivity</option>
+                    <option value="disclosure">FTC / paid disclosure</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <input type="text" id="new-req-label" class="form-control" placeholder="Requirement, e.g. 'Must be an Instagram Reel'" style="font-size: 0.75rem;">
+                  <input type="text" id="new-req-value" class="form-control" placeholder="Expected value, e.g. instagram.com, #SOCIAPartner, 2026-09-20" style="font-size: 0.75rem;">
+                  <label style="font-size: 0.7rem; display:flex; align-items:center; gap:0.4rem;"><input type="checkbox" id="new-req-required" checked> Required (blocks escrow release until met)</label>
+                  <button class="btn btn-primary" style="padding: 0.5rem; font-size: 0.75rem;" onclick="addDeliverableRequirement()">Add Requirement</button>
+                  <div id="requirements-list" style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.25rem;"></div>
+                </div>
+              </details>
+
+              <details class="req-panel" id="submit-deliverable-panel" style="display:none;">
+                <summary>Submit Deliverable Proof</summary>
+                <div class="req-panel-body">
+                  <p style="font-size: 0.68rem; color: var(--text-muted); margin: 0;">One line per link to the live posted content.</p>
+                  <textarea id="new-submission-urls" class="form-control" rows="2" placeholder="https://www.instagram.com/p/..." style="font-size: 0.75rem;"></textarea>
+                  <input type="text" id="new-submission-notes" class="form-control" placeholder="Notes (optional)" style="font-size: 0.75rem;">
+                  <button class="btn btn-primary" style="padding: 0.5rem; font-size: 0.75rem;" onclick="submitDeliverableProof()">Submit for Review</button>
+                </div>
+              </details>
+
+              <details class="req-panel" id="compliance-review-panel" style="display:none;">
+                <summary>Compliance Review</summary>
+                <div class="req-panel-body" id="compliance-review-body">
+                  <p style="font-size: 0.68rem; color: var(--text-muted); margin: 0;">No item is assumed met — confirm or reject each, with a reason.</p>
+                </div>
+              </details>
+
+              <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                <button class="btn btn-outline" style="flex:1; font-size: 0.7rem; padding: 0.5rem;" onclick="openInvoiceForNegotiation(activeChatContact ? activeChatContact.id : null)">View Invoice</button>
+                <button class="btn btn-danger" style="flex:1; font-size: 0.7rem; padding: 0.5rem;" onclick="raiseEscrowDispute()">Raise Dispute</button>
+              </div>
             </div>
 
             <div class="lock-section">
@@ -1313,6 +1424,11 @@
             <p style="font-size: 0.85rem; color: var(--navy-surface); line-height: 1.6; margin-bottom: 1rem;" id="detail-full-bio">
               Audited by SOCIA Algorithmic Indexer. Organic reach verified with zero bot farm flags detected.
             </p>
+
+            <div id="detail-account-data-wrap" style="display:none;">
+              <h3 class="serif-heading" style="margin: 2rem 0 1rem 0;">Account Matching Data</h3>
+              <div class="analytics-grid" id="detail-account-data-grid"></div>
+            </div>
           </div>
 
           <div>
@@ -1350,6 +1466,30 @@
         </div>
       </section>
 
+      <!-- BILLING VIEW -->
+      <section id="view-billing" class="view-section">
+        <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <h2 class="serif-heading" style="font-size: 1.4rem;">Billing & Invoices</h2>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">One invoice per negotiation, created the moment a deal is struck</span>
+        </div>
+
+        <div class="history-table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Invoice #</th>
+                <th>Counterparty</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Issued</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="billing-history-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- SUPPORT VIEW -->
       <section id="view-support" class="view-section">
         <div style="margin-bottom: 1.5rem;">
@@ -1380,6 +1520,21 @@
   </div>
 
   <!-- DRAFT PROPOSAL MODAL -->
+  <!-- INVOICE MODAL — reused by both the Negotiations sidebar and the Billing tab -->
+  <div class="modal-overlay" id="modal-invoice">
+    <div class="modal-content" style="max-width: 620px;">
+      <div class="modal-header">
+        <h2 class="serif-heading">Invoice</h2>
+        <button class="close-btn" aria-label="Close dialog" onclick="closeModal('modal-invoice')">✕</button>
+      </div>
+      <div id="invoice-modal-body" style="font-size: 0.85rem; color: var(--navy-surface);">Loading…</div>
+      <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem;">
+        <button class="btn btn-outline" style="flex: 1;" onclick="window.print()">Print / Save as PDF</button>
+        <button class="btn btn-primary" style="flex: 1;" onclick="closeModal('modal-invoice')">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="modal-proposal">
     <div class="modal-content">
       <div class="modal-header">
@@ -1412,6 +1567,7 @@
       
       <div class="settings-menu">
         <div class="settings-tab active" onclick="switchSettingsTab(event, 'panel-my-account')">My Accounts</div>
+        <div class="settings-tab" onclick="switchSettingsTab(event, 'panel-matching-data')">Matching Data</div>
         <div class="settings-tab" onclick="switchSettingsTab(event, 'panel-protocol')">Protocol Mode</div>
       </div>
 
@@ -1463,6 +1619,108 @@
           </div>
           <p style="font-size: 0.7rem; color: var(--text-muted); background: #F8FAFC; padding: 0.6rem; border-radius: 6px;">Billing address, tax ID, and payout bank details are never stored by SOCIA — they're managed securely and directly through Razorpay's regulated KYC system. Set those up under Payouts below.</p>
           <button class="btn btn-primary" style="margin-top: 0.5rem;" onclick="savePrivateAccountSettings()">Save Account Details</button>
+        </div>
+      </div>
+
+      <!-- Matching Data Panel — severely expanded account-level data collection that feeds
+           the algorithm directly (see compute_match_breakdown in main.py). Fields are the
+           same on both roles; the label just flips between "your actual" and "your requirement." -->
+      <div id="panel-matching-data" class="settings-panel">
+        <p style="font-size: 0.78rem; color: var(--text-muted);" id="matching-data-intro">The more of this you fill in, the more precisely the algorithm can score a fit — every field below directly feeds a real scoring factor or is shown to counterparties evaluating a match.</p>
+
+        <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+          <div class="settings-section-label">Social Handles</div>
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 150px;"><label class="settings-label">Instagram</label><input type="text" id="md-instagram" class="form-control" placeholder="@handle"></div>
+            <div style="flex: 1; min-width: 150px;"><label class="settings-label">YouTube</label><input type="text" id="md-youtube" class="form-control" placeholder="@handle"></div>
+            <div style="flex: 1; min-width: 150px;"><label class="settings-label">TikTok</label><input type="text" id="md-tiktok" class="form-control" placeholder="@handle"></div>
+          </div>
+
+          <div class="settings-section-label">Experience</div>
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 150px;"><label class="settings-label" id="md-lbl-years">Years Active</label><input type="number" id="md-years-active" class="form-control" min="0" placeholder="0"></div>
+            <div style="flex: 1; min-width: 150px;" id="md-company-size-wrap"><label class="settings-label">Company Size (sponsors)</label>
+              <select id="md-company-size" class="form-control">
+                <option value="">—</option>
+                <option value="Solo">Solo</option>
+                <option value="2-10">2-10</option>
+                <option value="11-50">11-50</option>
+                <option value="51-200">51-200</option>
+                <option value="200+">200+</option>
+              </select>
+            </div>
+          </div>
+          <div><label class="settings-label">Company Website</label><input type="text" id="md-company-website" class="form-control" placeholder="https://yourcompany.com"></div>
+
+          <div class="settings-section-label" id="md-lbl-audience-section">Audience Demographics</div>
+          <p class="settings-sublabel" id="md-lbl-audience-sub">Your audience's real composition — used to score against a sponsor's target audience.</p>
+          <div><label class="settings-label">Audience Age Range(s)</label><div class="checkbox-row" id="md-age-range-checks"></div></div>
+          <div>
+            <label class="settings-label">Audience Gender Lean</label>
+            <select id="md-gender-lean" class="form-control">
+              <option value="">No data / no preference</option>
+              <option value="balanced">Balanced</option>
+              <option value="majority_female">Majority Female</option>
+              <option value="majority_male">Majority Male</option>
+              <option value="majority_other">Majority Other</option>
+            </select>
+          </div>
+          <div><label class="settings-label">Audience Top Locations</label><input type="text" id="md-audience-locations" class="form-control" placeholder="United States, India, United Kingdom"></div>
+
+          <div class="settings-section-label" id="md-lbl-production-section">Production &amp; Track Record</div>
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 150px;">
+              <label class="settings-label" id="md-lbl-quality">Production Quality Tier</label>
+              <select id="md-quality-tier" class="form-control">
+                <option value="">—</option>
+                <option value="phone">Phone / Casual</option>
+                <option value="prosumer">Prosumer</option>
+                <option value="studio">Professional / Studio</option>
+              </select>
+            </div>
+            <div style="flex: 1; min-width: 150px;"><label class="settings-label">Posting Frequency (per week)</label><input type="number" id="md-posting-frequency" class="form-control" min="0" placeholder="0"></div>
+          </div>
+          <div><label class="settings-label">Portfolio / Case Studies URL</label><input type="text" id="md-portfolio-url" class="form-control" placeholder="https://..."></div>
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+            <div style="flex: 1; min-width: 150px;"><label class="settings-label">Past Paid Brand Collabs (#)</label><input type="number" id="md-past-collabs" class="form-control" min="0" placeholder="0"></div>
+            <div style="flex: 1; min-width: 150px; display:flex; flex-direction:column; gap:0.3rem;">
+              <label style="font-size: 0.75rem; display:flex; align-items:center; gap:0.4rem;"><input type="checkbox" id="md-agency-managed" onchange="document.getElementById('md-team-size-wrap').style.display = this.checked ? 'block' : 'none';"> Agency-managed</label>
+              <div id="md-team-size-wrap" style="display:none;"><input type="number" id="md-team-size" class="form-control" min="0" placeholder="Team size"></div>
+            </div>
+          </div>
+
+          <div class="settings-section-label">Deal Logistics</div>
+          <div><label class="settings-label" id="md-lbl-payment-terms">Payment Terms Accepted</label><div class="checkbox-row" id="md-payment-terms-checks"></div></div>
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 150px;">
+              <label class="settings-label">Content Usage Duration</label>
+              <select id="md-usage-duration" class="form-control">
+                <option value="">—</option>
+                <option value="30_days">30 days</option>
+                <option value="90_days">90 days</option>
+                <option value="1_year">1 year</option>
+                <option value="perpetual">Perpetual</option>
+              </select>
+            </div>
+            <div style="flex: 1; min-width: 150px;"><label class="settings-label">Min. Notice / Lead Time (days)</label><input type="number" id="md-min-notice" class="form-control" min="0" placeholder="0"></div>
+          </div>
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 150px;"><label class="settings-label">Revision Rounds Included</label><input type="number" id="md-revision-rounds" class="form-control" min="0" placeholder="0"></div>
+            <div style="flex: 1; min-width: 150px; display:flex; align-items:flex-end;"><label style="font-size: 0.75rem; display:flex; align-items:center; gap:0.4rem;"><input type="checkbox" id="md-whitelisting"> <span id="md-lbl-whitelisting">Allow whitelisting (paid ad use)</span></label></div>
+          </div>
+
+          <div class="settings-section-label">Style &amp; Rating</div>
+          <div><label class="settings-label">Communication Style</label><div class="checkbox-row" id="md-comm-style-checks"></div></div>
+          <div>
+            <label class="settings-label">Content Rating</label>
+            <select id="md-content-rating" class="form-control">
+              <option value="">—</option>
+              <option value="general">General audience</option>
+              <option value="mature">Mature / 18+</option>
+            </select>
+          </div>
+
+          <button class="btn btn-primary" style="margin-top: 0.5rem;" onclick="saveMatchingDataSettings()">Save Matching Data</button>
         </div>
       </div>
 
@@ -1681,6 +1939,11 @@
     const PRESET_CONTENT_FORMATS = ['Reels/Shorts', 'Long-form Video', 'Livestream', 'Static Post', 'Story', 'Blog/Newsletter', 'Podcast'];
     const PRESET_TONES = ['Comedic', 'Educational', 'Luxury/Aspirational', 'Raw/Authentic', 'Professional', 'Edgy', 'Wholesome'];
     const PRESET_VALUES = ['Sustainability', 'Social Impact', 'Family-Friendly', 'LGBTQ+ Inclusive', 'Faith-Based', 'Political-Neutral'];
+    // --- Matching Data settings tab (Sept 2026) — machine-readable values matched exactly
+    // against main.py's fixed vocabularies/enums, human-readable labels shown to the user.
+    const AGE_RANGE_OPTIONS = ['13-17', '18-24', '25-34', '35-44', '45-54', '55+'];
+    const PAYMENT_TERMS_OPTIONS = [['upfront', '100% Upfront'], ['fifty_fifty', '50/50 Milestone'], ['net_30', 'Net-30'], ['on_delivery', 'On Delivery']];
+    const COMM_STYLE_OPTIONS = [['fast_casual', 'Fast & Casual'], ['structured_formal', 'Structured & Formal'], ['collaborative_feedback', 'Collaborative / Feedback-heavy'], ['independent_handsoff', 'Independent / Hands-off']];
 
     function updateBioCounter() {
       const bio = document.getElementById('tab-reg-bio');
@@ -2179,9 +2442,9 @@
 
     function renderTabs() {
       const tabsContainer = document.getElementById('nav-tabs');
-      let tabs = currentRole === 'sponsor' 
-        ? ['Find Influencers', 'Post Listing', 'My Listings', 'Incoming Pitches', 'Sent Pitches', 'Negotiations', 'Deal History', 'Support']
-        : ['Find Sponsors', 'Post Listing', 'My Listings', 'Incoming Pitches', 'Sent Pitches', 'Negotiations', 'Deal History', 'Support'];
+      let tabs = currentRole === 'sponsor'
+        ? ['Find Influencers', 'Post Listing', 'My Listings', 'Incoming Pitches', 'Sent Pitches', 'Negotiations', 'Deal History', 'Billing', 'Support']
+        : ['Find Sponsors', 'Post Listing', 'My Listings', 'Incoming Pitches', 'Sent Pitches', 'Negotiations', 'Deal History', 'Billing', 'Support'];
 
       document.getElementById('marketplace-title').innerText = currentRole === 'sponsor' ? "Institutional Creator Discovery" : "Verified Sponsor Opportunities";
 
@@ -2226,6 +2489,10 @@
       } else if (tabName === 'Deal History') {
         showView('view-deal-history');
         loadDealHistoryFromBackend();
+        stopChatPolling();
+      } else if (tabName === 'Billing') {
+        showView('view-billing');
+        loadBillingHistory();
         stopChatPolling();
       } else if (tabName === 'Support') {
         showView('view-support');
@@ -2434,7 +2701,8 @@
               // BUG FIX (Sept 2026): fallback used to be `true` — if the backend ever omitted
               // the field, the card would claim "SOCIA Verified" by default instead of the
               // safe assumption (unverified). Default is now false, matching the backend.
-              verified: bp.verified !== undefined ? bp.verified : false
+              verified: bp.verified !== undefined ? bp.verified : false,
+              accountData: bp.accountData || null
             });
           }
         });
@@ -2458,6 +2726,12 @@
             <span>Rates/Budget: <strong>${sanitizeHTML(p.rates)}</strong></span>
           </div>
           <p style="font-size: 0.80rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.4;">${sanitizeHTML(p.bio)}</p>
+          ${p.accountData ? `<div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.75rem;">
+            ${p.accountData.productionQualityTier ? `<span style="font-size:0.65rem; background:#EFF6FF; color:var(--action-blue); padding:0.2rem 0.5rem; border-radius:10px; border:1px solid #BFDBFE;">${sanitizeHTML(p.accountData.productionQualityTier)}</span>` : ''}
+            ${p.accountData.isAgencyManaged ? `<span style="font-size:0.65rem; background:#F1F5F9; color:var(--navy-main); padding:0.2rem 0.5rem; border-radius:10px; border:1px solid #E2E8F0;">Agency-managed</span>` : ''}
+            ${p.accountData.pastBrandCollabsCount ? `<span style="font-size:0.65rem; background:#F1F5F9; color:var(--navy-main); padding:0.2rem 0.5rem; border-radius:10px; border:1px solid #E2E8F0;">${p.accountData.pastBrandCollabsCount} past collabs</span>` : ''}
+            ${p.accountData.yearsActive ? `<span style="font-size:0.65rem; background:#F1F5F9; color:var(--navy-main); padding:0.2rem 0.5rem; border-radius:10px; border:1px solid #E2E8F0;">${p.accountData.yearsActive}yr experience</span>` : ''}
+          </div>` : ''}
           <div class="pre-conditions">
             <h4>Mandatory Metrics & Conditions</h4>
             <ul>
@@ -2481,8 +2755,47 @@
       
       const preList = document.getElementById('detail-preconditions');
       preList.innerHTML = profile.preConditions.map(c => `<li>${sanitizeHTML(c)}</li>`).join('');
-      
+
+      renderDetailAccountData(profile.accountData);
+
       showView('view-profile-detail');
+    }
+
+    function renderDetailAccountData(ad) {
+      const wrap = document.getElementById('detail-account-data-wrap');
+      const grid = document.getElementById('detail-account-data-grid');
+      if (!ad) { wrap.style.display = 'none'; return; }
+
+      const rows = [];
+      if (ad.productionQualityTier) rows.push(['Production Quality', ad.productionQualityTier]);
+      if (ad.yearsActive) rows.push(['Experience', `${ad.yearsActive} year(s)`]);
+      if (ad.postingFrequencyPerWeek) rows.push(['Posting Frequency', `${ad.postingFrequencyPerWeek}/week`]);
+      if (ad.pastBrandCollabsCount) rows.push(['Past Brand Collabs', ad.pastBrandCollabsCount]);
+      if (ad.audienceAgeRange && ad.audienceAgeRange.length) rows.push(['Audience Age', ad.audienceAgeRange.join(', ')]);
+      if (ad.audienceGenderLean) rows.push(['Audience Gender Lean', ad.audienceGenderLean.replace(/_/g, ' ')]);
+      if (ad.audienceTopLocations && ad.audienceTopLocations.length) rows.push(['Audience Locations', ad.audienceTopLocations.join(', ')]);
+      if (ad.paymentTermsAccepted && ad.paymentTermsAccepted.length) rows.push(['Payment Terms', ad.paymentTermsAccepted.join(', ').replace(/_/g, ' ')]);
+      if (ad.contentUsageDurationPref) rows.push(['Usage Duration', ad.contentUsageDurationPref.replace(/_/g, ' ')]);
+      if (ad.revisionRoundsIncluded) rows.push(['Revision Rounds', ad.revisionRoundsIncluded]);
+      if (ad.minNoticeDays) rows.push(['Min. Notice', `${ad.minNoticeDays} day(s)`]);
+      if (ad.communicationStyle && ad.communicationStyle.length) rows.push(['Communication Style', ad.communicationStyle.join(', ').replace(/_/g, ' ')]);
+      if (ad.contentRating) rows.push(['Content Rating', ad.contentRating]);
+      if (ad.isAgencyManaged) rows.push(['Agency-Managed', `Yes${ad.teamSize ? ' (' + ad.teamSize + ' people)' : ''}`]);
+      if (ad.whitelistingAllowed) rows.push(['Whitelisting', 'Allowed']);
+      if (ad.portfolioUrl) rows.push(['Portfolio', ad.portfolioUrl]);
+      if (ad.companyWebsite) rows.push(['Website', ad.companyWebsite]);
+      if (ad.instagramHandle) rows.push(['Instagram', ad.instagramHandle]);
+      if (ad.youtubeHandle) rows.push(['YouTube', ad.youtubeHandle]);
+      if (ad.tiktokHandle) rows.push(['TikTok', ad.tiktokHandle]);
+
+      if (rows.length === 0) { wrap.style.display = 'none'; return; }
+      wrap.style.display = 'block';
+      grid.innerHTML = rows.map(([label, val]) => `
+        <div class="stat-box">
+          <div class="lbl">${sanitizeHTML(label)}</div>
+          <div class="val" style="font-size: 0.95rem;">${sanitizeHTML(String(val))}</div>
+        </div>
+      `).join('');
     }
 
     function openProposalModal() {
@@ -2717,6 +3030,8 @@
         renderNegotiationConditions();
         updateLockStatusDisplay();
         loadEscrowStatus(contactId);
+        loadRequirementsAndCompliance(contactId);
+        document.getElementById('submit-deliverable-panel').style.display = (userSession.email === activeChatContact.influencer_email) ? 'block' : 'none';
         startChatPolling(contactId);
       }
     }
@@ -2905,6 +3220,304 @@
       }
     }
 
+    // --- OBJECTIVE DELIVERABLE REQUIREMENTS & COMPLIANCE ---
+    const REASON_CODE_OPTIONS = [
+      ["confirmed", "Confirmed met"],
+      ["missing_evidence", "Missing evidence"],
+      ["deadline_missed", "Deadline missed"],
+      ["wrong_platform", "Wrong platform"],
+      ["wrong_format", "Wrong format"],
+      ["content_removed", "Content removed"],
+      ["count_short", "Count short"],
+      ["waived", "Waived by sponsor"],
+      ["other", "Other"],
+    ];
+
+    async function loadRequirementsAndCompliance(negotiationId) {
+      try {
+        const res = await authFetch(`${BACKEND_URL}/api/negotiations/${negotiationId}/requirements`);
+        activeChatContact.requirements = await res.json();
+      } catch (err) {
+        activeChatContact.requirements = [];
+      }
+      renderRequirementsList();
+      await refreshCompliance(negotiationId);
+    }
+
+    function renderRequirementsList() {
+      const container = document.getElementById('requirements-list');
+      if (!activeChatContact || !activeChatContact.requirements) { container.innerHTML = ''; return; }
+      const compliance = activeChatContact.compliance;
+      const metByReqId = {};
+      if (compliance) compliance.items.forEach(it => { metByReqId[it.requirement_id] = it; });
+
+      if (activeChatContact.requirements.length === 0) {
+        container.innerHTML = `<span style="font-size:0.7rem; color:var(--text-muted);">No objective requirements defined yet — escrow will release on mutual lock alone.</span>`;
+        return;
+      }
+
+      container.innerHTML = activeChatContact.requirements.map(req => {
+        const item = metByReqId[req.id];
+        const met = item ? item.met : false;
+        const canDelete = req.created_by_role === currentRole;
+        return `
+          <div class="req-item ${req.required ? (met ? 'met' : 'unmet') : ''}">
+            <div class="req-item-label">${sanitizeHTML(req.label)} ${req.required ? '' : '<span style="font-weight:400; opacity:0.6;">(optional)</span>'}</div>
+            <div class="req-item-meta">${sanitizeHTML(req.category)}${req.expected_value ? ' · expects: ' + sanitizeHTML(req.expected_value) : ''} · added by ${sanitizeHTML(req.created_by_role.toUpperCase())}${item ? ' · ' + (met ? '✓ met (' + sanitizeHTML(item.reason_code || '') + ')' : '✗ not met') : ' · awaiting review'}</div>
+            ${canDelete ? `<button style="background:none; border:none; color:var(--danger-red); cursor:pointer; font-size:0.68rem; padding:0.2rem 0; margin-top:0.15rem;" onclick="deleteRequirement(${req.id})">Remove</button>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function refreshCompliance(negotiationId) {
+      try {
+        const res = await authFetch(`${BACKEND_URL}/api/negotiations/${negotiationId}/compliance`);
+        activeChatContact.compliance = await res.json();
+      } catch (err) {
+        activeChatContact.compliance = null;
+      }
+      renderComplianceSummary();
+      renderComplianceReviewPanel();
+      renderRequirementsList();
+    }
+
+    function renderComplianceSummary() {
+      const box = document.getElementById('compliance-summary-box');
+      const compliance = activeChatContact ? activeChatContact.compliance : null;
+      if (!compliance || !compliance.has_requirements) { box.style.display = 'none'; return; }
+      box.style.display = 'block';
+      document.getElementById('compliance-summary-pct').innerText = `${compliance.compliance_percent}%`;
+      document.getElementById('compliance-summary-fill').style.width = `${compliance.compliance_percent}%`;
+      document.getElementById('compliance-summary-fill').style.background = compliance.all_required_met ? 'var(--trust-green)' : 'var(--warning-amber)';
+      document.getElementById('compliance-summary-note').innerText = compliance.all_required_met
+        ? `All ${compliance.required_total} required condition(s) confirmed met — escrow release is not blocked by compliance.`
+        : `${compliance.required_met} of ${compliance.required_total} required condition(s) confirmed met — escrow release is held until the rest are reviewed.`;
+    }
+
+    async function addDeliverableRequirement() {
+      if (!activeChatContact) { alert("Select an active negotiation log first."); return; }
+      const category = document.getElementById('new-req-category').value;
+      const label = document.getElementById('new-req-label').value.trim();
+      const expected_value = document.getElementById('new-req-value').value.trim();
+      const required = document.getElementById('new-req-required').checked;
+      if (!label) { alert("Describe the requirement first."); return; }
+
+      try {
+        const res = await authFetch(`${BACKEND_URL}/api/negotiations/${activeChatContact.id}/requirements`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category, label, expected_value, required })
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          alert(errData.detail || "Could not add requirement.");
+          return;
+        }
+        document.getElementById('new-req-label').value = '';
+        document.getElementById('new-req-value').value = '';
+        await selectNegotiationContact(activeChatContact.id);
+      } catch (err) {
+        alert("Could not add requirement: backend unreachable.");
+      }
+    }
+
+    async function deleteRequirement(requirementId) {
+      if (!activeChatContact) return;
+      try {
+        const res = await authFetch(`${BACKEND_URL}/api/negotiations/${activeChatContact.id}/requirements/${requirementId}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          alert(errData.detail || "Could not remove requirement.");
+          return;
+        }
+        await selectNegotiationContact(activeChatContact.id);
+      } catch (err) {
+        alert("Could not remove requirement: backend unreachable.");
+      }
+    }
+
+    async function submitDeliverableProof() {
+      if (!activeChatContact) return;
+      const proof_urls = document.getElementById('new-submission-urls').value.trim();
+      const notes = document.getElementById('new-submission-notes').value.trim();
+      if (!proof_urls) { alert("Add at least one link to the posted content."); return; }
+
+      try {
+        const res = await authFetch(`${BACKEND_URL}/api/negotiations/${activeChatContact.id}/deliverables`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ proof_urls, notes })
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          alert(errData.detail || "Could not submit deliverable proof.");
+          return;
+        }
+        document.getElementById('new-submission-urls').value = '';
+        document.getElementById('new-submission-notes').value = '';
+        alert("Deliverable proof submitted. Objective checks (deadline/platform) ran automatically; anything left needs sponsor review.");
+        await selectNegotiationContact(activeChatContact.id);
+      } catch (err) {
+        alert("Could not submit deliverable proof: backend unreachable.");
+      }
+    }
+
+    function renderComplianceReviewPanel() {
+      const panel = document.getElementById('compliance-review-panel');
+      const body = document.getElementById('compliance-review-body');
+      const isSponsor = activeChatContact && userSession.email === activeChatContact.sponsor_email;
+      const compliance = activeChatContact ? activeChatContact.compliance : null;
+
+      if (!isSponsor || !compliance || compliance.items.length === 0) { panel.style.display = 'none'; return; }
+      panel.style.display = 'block';
+
+      body.innerHTML = `
+        <p style="font-size: 0.68rem; color: var(--text-muted); margin: 0;">No item is assumed met — confirm or reject each, with a reason.</p>
+        ${compliance.items.map(item => `
+          <div class="req-item">
+            <div class="req-item-label">${sanitizeHTML(item.label)}</div>
+            <div style="display:flex; gap:0.4rem; margin-top:0.4rem; align-items:center;">
+              <select id="review-met-${item.requirement_id}" class="form-control" style="font-size:0.7rem; flex:1;">
+                <option value="true" ${item.met ? 'selected' : ''}>Met</option>
+                <option value="false" ${!item.met ? 'selected' : ''}>Not met</option>
+              </select>
+              <select id="review-reason-${item.requirement_id}" class="form-control" style="font-size:0.7rem; flex:1;">
+                ${REASON_CODE_OPTIONS.map(([code, lbl]) => `<option value="${code}" ${item.reason_code === code ? 'selected' : ''}>${lbl}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+        `).join('')}
+        <button class="btn btn-success" style="padding: 0.5rem; font-size: 0.75rem;" onclick="saveComplianceReview()">Save Review</button>
+      `;
+    }
+
+    async function saveComplianceReview() {
+      if (!activeChatContact || !activeChatContact.compliance) return;
+      const reviews = activeChatContact.compliance.items.map(item => ({
+        requirement_id: item.requirement_id,
+        met: document.getElementById(`review-met-${item.requirement_id}`).value === 'true',
+        reason_code: document.getElementById(`review-reason-${item.requirement_id}`).value,
+        note: '',
+      }));
+      try {
+        const res = await authFetch(`${BACKEND_URL}/api/negotiations/${activeChatContact.id}/deliverables/review`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reviews })
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          alert(errData.detail || "Could not save review.");
+          return;
+        }
+        alert("Compliance review saved. If every required item is met and both sides are locked, escrow will release automatically.");
+        await selectNegotiationContact(activeChatContact.id);
+        loadEscrowStatus(activeChatContact.id);
+      } catch (err) {
+        alert("Could not save review: backend unreachable.");
+      }
+    }
+
+    async function raiseEscrowDispute() {
+      if (!activeChatContact) { alert("Select an active negotiation log first."); return; }
+      const reason = prompt("Describe the dispute (this is recorded on the deal's permanent log and reviewed by SOCIA):");
+      if (!reason || !reason.trim()) return;
+      try {
+        const res = await authFetch(`${BACKEND_URL}/api/negotiations/${activeChatContact.id}/disputes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: reason.trim() })
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          alert(errData.detail || "Could not raise dispute.");
+          return;
+        }
+        alert("Dispute raised. Escrow is held and SOCIA will review the deal's requirement checklist to resolve it.");
+        await selectNegotiationContact(activeChatContact.id);
+        loadEscrowStatus(activeChatContact.id);
+      } catch (err) {
+        alert("Could not raise dispute: backend unreachable.");
+      }
+    }
+
+    // --- INVOICING & BILLING ---
+    async function openInvoiceForNegotiation(negotiationId) {
+      if (!negotiationId) { alert("Select an active negotiation log first."); return; }
+      const body = document.getElementById('invoice-modal-body');
+      body.innerHTML = 'Loading…';
+      document.getElementById('modal-invoice').classList.add('active');
+      try {
+        const res = await authFetch(`${BACKEND_URL}/api/negotiations/${negotiationId}/invoice`);
+        if (!res.ok) {
+          body.innerHTML = `<p style="color:var(--text-muted);">No invoice exists for this negotiation yet.</p>`;
+          return;
+        }
+        const data = await res.json();
+        renderInvoiceModal(data.invoice, data.line_items);
+      } catch (err) {
+        body.innerHTML = `<p style="color:var(--danger-red);">Could not load invoice: backend unreachable.</p>`;
+      }
+    }
+
+    function renderInvoiceModal(inv, lineItems) {
+      const body = document.getElementById('invoice-modal-body');
+      const statusColor = { released: 'var(--trust-green)', funded: 'var(--action-blue)', disputed: 'var(--danger-red)', refunded: 'var(--danger-red)' }[inv.status] || 'var(--warning-amber)';
+      body.innerHTML = `
+        <div style="display:flex; justify-content:space-between; margin-bottom:1rem;">
+          <div>
+            <div style="font-weight:800; font-size:1.05rem;">${sanitizeHTML(inv.invoice_number)}</div>
+            <div style="font-size:0.72rem; color:var(--text-muted);">Issued ${new Date(inv.issued_at).toLocaleDateString()}</div>
+          </div>
+          <span class="status-badge" style="background:${statusColor}22; color:${statusColor}; border:1px solid ${statusColor};">${sanitizeHTML(inv.status)}</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1rem; font-size:0.78rem;">
+          <div><strong>Sponsor (Bill To)</strong><br>${sanitizeHTML(inv.sponsor_name)}<br>${sanitizeHTML(inv.sponsor_email)}</div>
+          <div><strong>Influencer (Pay To)</strong><br>${sanitizeHTML(inv.influencer_name)}<br>${sanitizeHTML(inv.influencer_email)}</div>
+        </div>
+        <table class="invoice-table">
+          ${lineItems.map(li => `<tr><td>${sanitizeHTML(li.description)}</td><td style="text-align:right;">₹${li.line_total.toLocaleString()}</td></tr>`).join('')}
+          <tr><td>Gross amount</td><td style="text-align:right;">₹${inv.gross_amount.toLocaleString()}</td></tr>
+          <tr><td>SOCIA platform fee (${inv.platform_fee_percent}%)</td><td style="text-align:right;">− ₹${inv.platform_fee_amount.toLocaleString()}</td></tr>
+          <tr style="font-weight:800;"><td>Net payout to influencer</td><td style="text-align:right;">₹${inv.net_payout_amount.toLocaleString()}</td></tr>
+        </table>
+        <div style="margin-top:1rem; font-size:0.7rem; color:var(--text-muted); display:flex; flex-direction:column; gap:0.2rem;">
+          ${inv.funded_at ? `<span>Funded: ${new Date(inv.funded_at).toLocaleString()}</span>` : ''}
+          ${inv.released_at ? `<span>Released: ${new Date(inv.released_at).toLocaleString()}</span>` : ''}
+          ${inv.refunded_at ? `<span>Refunded: ${new Date(inv.refunded_at).toLocaleString()}</span>` : ''}
+        </div>
+      `;
+    }
+
+    async function loadBillingHistory() {
+      const tbody = document.getElementById('billing-history-rows');
+      try {
+        const res = await authFetch(`${BACKEND_URL}/api/billing/history`);
+        const invoices = await res.json();
+        if (invoices.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">No invoices yet — one is created the moment a pitch is accepted.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = invoices.map(inv => {
+          const isSponsor = userSession.email === inv.sponsor_email;
+          const counterparty = isSponsor ? inv.influencer_name : inv.sponsor_name;
+          return `
+            <tr>
+              <td>${sanitizeHTML(inv.invoice_number)}</td>
+              <td>${sanitizeHTML(counterparty)}</td>
+              <td>₹${inv.gross_amount.toLocaleString()}</td>
+              <td><span class="status-badge status-pending">${sanitizeHTML(inv.status)}</span></td>
+              <td>${new Date(inv.issued_at).toLocaleDateString()}</td>
+              <td><button class="btn btn-outline" style="font-size:0.7rem; padding:0.35rem 0.6rem;" onclick="openInvoiceForNegotiation(${inv.negotiation_id})">View</button></td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--danger-red);">Could not load billing history. Backend unreachable.</td></tr>`;
+      }
+    }
+
     async function toggleLockIn(isLocked) {
       if(!activeChatContact) {
         alert("Please select an active negotiation log from the left sidebar first.");
@@ -2964,6 +3577,7 @@
           if (hadFewerMessages) renderChatMessages();
           renderNegotiationConditions();
           updateLockStatusDisplay();
+          refreshCompliance(negotiationId);
         } catch (err) { /* silent fail, will retry on next interval */ }
       }, 4000);
     }
@@ -3065,21 +3679,127 @@
     }
     async function openSettingsModal() {
       document.getElementById('modal-settings').classList.add('active');
+      renderMatchingDataCheckboxes();
+      updateMatchingDataLabels(currentRole);
       try {
         const res = await authFetch(`${BACKEND_URL}/api/account/settings`);
         if (res.ok) {
           const data = await res.json();
+          const pd = data.private_details || {};
           document.getElementById('settings-input-name').value = data.display_name || '';
           document.getElementById('settings-input-email').value = data.email || '';
-          document.getElementById('settings-input-company').value = (data.private_details || {}).company_name || '';
-          document.getElementById('settings-input-phone').value = (data.private_details || {}).phone_number || '';
-          document.getElementById('settings-input-industry').value = (data.private_details || {}).industry || '';
+          document.getElementById('settings-input-company').value = pd.company_name || '';
+          document.getElementById('settings-input-phone').value = pd.phone_number || '';
+          document.getElementById('settings-input-industry').value = pd.industry || '';
+          populateMatchingDataForm(pd);
         }
       } catch (err) {
         console.warn("Could not load latest settings from backend; showing local values.");
       }
       checkStripeConnectStatus();
       checkSovereignPassStatus();
+    }
+
+    function renderMatchingDataCheckboxes() {
+      const ageContainer = document.getElementById('md-age-range-checks');
+      if (ageContainer && !ageContainer.dataset.rendered) {
+        ageContainer.innerHTML = AGE_RANGE_OPTIONS.map(a => `<label><input type="checkbox" class="md-age-checkbox" value="${a}"> ${a}</label>`).join('');
+        ageContainer.dataset.rendered = '1';
+      }
+      const paymentContainer = document.getElementById('md-payment-terms-checks');
+      if (paymentContainer && !paymentContainer.dataset.rendered) {
+        paymentContainer.innerHTML = PAYMENT_TERMS_OPTIONS.map(([v, l]) => `<label><input type="checkbox" class="md-payment-checkbox" value="${v}"> ${l}</label>`).join('');
+        paymentContainer.dataset.rendered = '1';
+      }
+      const commContainer = document.getElementById('md-comm-style-checks');
+      if (commContainer && !commContainer.dataset.rendered) {
+        commContainer.innerHTML = COMM_STYLE_OPTIONS.map(([v, l]) => `<label><input type="checkbox" class="md-comm-checkbox" value="${v}"> ${l}</label>`).join('');
+        commContainer.dataset.rendered = '1';
+      }
+    }
+
+    function updateMatchingDataLabels(role) {
+      const isSponsor = role === 'sponsor';
+      document.getElementById('md-lbl-years').innerText = isSponsor ? 'Years Running Sponsorship Campaigns' : 'Years Active as a Creator';
+      document.getElementById('md-company-size-wrap').style.display = isSponsor ? 'block' : 'none';
+      document.getElementById('md-lbl-audience-section').innerText = isSponsor ? 'Target Audience Requirement' : 'Audience Demographics';
+      document.getElementById('md-lbl-audience-sub').innerText = isSponsor
+        ? "The audience composition you need from a creator — scored against their actual audience."
+        : "Your audience's real composition — scored against a sponsor's target requirement.";
+      document.getElementById('md-lbl-production-section').innerText = isSponsor ? 'Production Requirements & History' : 'Production & Track Record';
+      document.getElementById('md-lbl-quality').innerText = isSponsor ? 'Minimum Production Quality Required' : 'Your Production Quality Tier';
+      document.getElementById('md-lbl-payment-terms').innerText = isSponsor ? 'Payment Terms You Offer' : 'Payment Terms You Accept';
+      document.getElementById('md-lbl-whitelisting').innerText = isSponsor ? 'Requires whitelisting (paid ad use)' : 'Allow whitelisting (paid ad use)';
+    }
+
+    function populateMatchingDataForm(pd) {
+      document.getElementById('md-instagram').value = pd.instagram_handle || '';
+      document.getElementById('md-youtube').value = pd.youtube_handle || '';
+      document.getElementById('md-tiktok').value = pd.tiktok_handle || '';
+      document.getElementById('md-years-active').value = pd.years_active || '';
+      document.getElementById('md-company-size').value = pd.company_size || '';
+      document.getElementById('md-company-website').value = pd.company_website || '';
+      document.getElementById('md-gender-lean').value = pd.audience_gender_lean || '';
+      document.getElementById('md-audience-locations').value = (pd.audience_top_locations || []).join(', ');
+      document.getElementById('md-quality-tier').value = pd.production_quality_tier || '';
+      document.getElementById('md-posting-frequency').value = pd.posting_frequency_per_week || '';
+      document.getElementById('md-portfolio-url').value = pd.portfolio_url || '';
+      document.getElementById('md-past-collabs').value = pd.past_brand_collabs_count || '';
+      document.getElementById('md-agency-managed').checked = !!pd.is_agency_managed;
+      document.getElementById('md-team-size-wrap').style.display = pd.is_agency_managed ? 'block' : 'none';
+      document.getElementById('md-team-size').value = pd.team_size || '';
+      document.getElementById('md-usage-duration').value = pd.content_usage_duration_pref || '';
+      document.getElementById('md-min-notice').value = pd.min_notice_days || '';
+      document.getElementById('md-revision-rounds').value = pd.revision_rounds_included || '';
+      document.getElementById('md-whitelisting').checked = !!pd.whitelisting_allowed;
+      document.getElementById('md-content-rating').value = pd.content_rating || '';
+
+      document.querySelectorAll('.md-age-checkbox').forEach(cb => cb.checked = (pd.audience_age_range || []).includes(cb.value));
+      document.querySelectorAll('.md-payment-checkbox').forEach(cb => cb.checked = (pd.payment_terms_accepted || []).includes(cb.value));
+      document.querySelectorAll('.md-comm-checkbox').forEach(cb => cb.checked = (pd.communication_style || []).includes(cb.value));
+    }
+
+    async function saveMatchingDataSettings() {
+      const payload = {
+        instagram_handle: sanitizeHTML(document.getElementById('md-instagram').value.trim()),
+        youtube_handle: sanitizeHTML(document.getElementById('md-youtube').value.trim()),
+        tiktok_handle: sanitizeHTML(document.getElementById('md-tiktok').value.trim()),
+        years_active: parseInt(document.getElementById('md-years-active').value) || 0,
+        company_size: document.getElementById('md-company-size').value,
+        company_website: sanitizeHTML(document.getElementById('md-company-website').value.trim()),
+        audience_gender_lean: document.getElementById('md-gender-lean').value,
+        audience_top_locations: document.getElementById('md-audience-locations').value.split(',').map(s => sanitizeHTML(s.trim())).filter(Boolean),
+        production_quality_tier: document.getElementById('md-quality-tier').value,
+        posting_frequency_per_week: parseInt(document.getElementById('md-posting-frequency').value) || 0,
+        portfolio_url: sanitizeHTML(document.getElementById('md-portfolio-url').value.trim()),
+        past_brand_collabs_count: parseInt(document.getElementById('md-past-collabs').value) || 0,
+        is_agency_managed: document.getElementById('md-agency-managed').checked,
+        team_size: parseInt(document.getElementById('md-team-size').value) || 0,
+        content_usage_duration_pref: document.getElementById('md-usage-duration').value,
+        min_notice_days: parseInt(document.getElementById('md-min-notice').value) || 0,
+        revision_rounds_included: parseInt(document.getElementById('md-revision-rounds').value) || 0,
+        whitelisting_allowed: document.getElementById('md-whitelisting').checked,
+        content_rating: document.getElementById('md-content-rating').value,
+        audience_age_range: Array.from(document.querySelectorAll('.md-age-checkbox:checked')).map(cb => cb.value),
+        payment_terms_accepted: Array.from(document.querySelectorAll('.md-payment-checkbox:checked')).map(cb => cb.value),
+        communication_style: Array.from(document.querySelectorAll('.md-comm-checkbox:checked')).map(cb => cb.value),
+      };
+
+      try {
+        const res = await authFetch(`${BACKEND_URL}/api/account/settings`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          alert(`Could not save matching data: ${errData.detail || 'Unknown error.'}`);
+          return;
+        }
+        alert("Matching data saved — this feeds directly into your algorithmic match scores.");
+      } catch (err) {
+        alert("Could not save matching data: backend unreachable.");
+      }
     }
 
     async function checkSovereignPassStatus() {

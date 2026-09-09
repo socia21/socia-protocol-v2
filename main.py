@@ -138,6 +138,35 @@ class UserAccount(SQLModel, table=True):
     years_active: int = Field(default=0)  # years creating content / running sponsorship campaigns — self-reported experience signal
     company_size: str = Field(default="")  # sponsors only, self-reported bucket: "Solo","2-10","11-50","51-200","200+"
 
+    # --- New (Sept 2026): severe expansion of account-level data collection so the algorithm
+    # has real signal to work with beyond "does the niche and budget line up." Same
+    # requirement-vs-actual pattern used throughout the algorithm: an influencer fills these
+    # in as their real stats/preferences; a sponsor fills the SAME fields in as what they
+    # require/offer, and matching scores the fit between the two — see compute_match_breakdown.
+    #
+    # Audience demographics (influencer: actual audience composition; sponsor: target requirement)
+    audience_age_range: str = Field(default="")  # comma-separated tags: "13-17,18-24,25-34,35-44,45-54,55+"
+    audience_gender_lean: str = Field(default="")  # "balanced" | "majority_female" | "majority_male" | "majority_other" | "" (no data/no preference)
+    audience_top_locations: str = Field(default="")  # comma-separated countries/regions, e.g. "United States,India,United Kingdom"
+    # Production & experience (influencer-side facts; sponsors leave most of these blank)
+    production_quality_tier: str = Field(default="")  # "phone" | "prosumer" | "studio" — influencer: actual; sponsor: minimum required
+    posting_frequency_per_week: int = Field(default=0)
+    portfolio_url: str = Field(default="")
+    past_brand_collabs_count: int = Field(default=0)
+    is_agency_managed: bool = Field(default=False)
+    team_size: int = Field(default=0)
+    # Deal-shape logistics, account-level defaults (distinguish from per-listing turnaround_days)
+    payment_terms_accepted: str = Field(default="")  # comma-separated: "upfront,fifty_fifty,net_30,on_delivery" — influencer: terms accepted; sponsor: terms offered
+    content_usage_duration_pref: str = Field(default="")  # "30_days" | "90_days" | "1_year" | "perpetual"
+    whitelisting_allowed: bool = Field(default=False)  # influencer: will allow the brand to run their content as paid ads; sponsor: requires this
+    revision_rounds_included: int = Field(default=0)  # influencer: revisions included in their standard rate
+    min_notice_days: int = Field(default=0)  # influencer: minimum lead time needed to book a campaign
+    # Subjective / working-style fit
+    communication_style: str = Field(default="")  # comma-separated tags: "fast_casual,structured_formal,collaborative_feedback,independent_handsoff"
+    content_rating: str = Field(default="")  # "general" | "mature" — influencer: typical content rating; sponsor: requirement
+    # Sponsor business identity
+    company_website: str = Field(default="")
+
 class MarketplaceListing(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     contact: str
@@ -275,6 +304,125 @@ class EscrowPayment(SQLModel, table=True):
     funded_at: Optional[datetime] = Field(default=None)
     released_at: Optional[datetime] = Field(default=None)
 
+# ============================================================================
+# OBJECTIVE DELIVERABLE COMPLIANCE ENGINE + INVOICING (Sept 2026)
+# ============================================================================
+# What existed before this: NegotiationCondition was a free-text sentence, and escrow
+# released the moment both sides clicked "lock" on the deal TERMS — there was no check
+# at all that the influencer had actually delivered anything before funds moved. That's
+# fine for trust between two people who already know each other, but it's exactly the
+# kind of grey area a stranger-to-stranger marketplace can't run on.
+#
+# This engine adds a second, separate gate: a checklist of REQUIREMENTS that are facts,
+# not opinions (a platform name, a hashtag, a date, a count — never "good content"), each
+# with a fixed category so a few of them (deadline, platform) can be checked automatically
+# from timestamps and submitted URLs with zero interpretation involved. Every other item
+# still needs a human to confirm it, but that confirmation is captured as one of a small
+# fixed set of reason codes (RequirementCheck), never a free-form judgment call — so months
+# later, a dispute can be settled by reading this table instead of re-arguing what was meant.
+#
+# Design rule that makes this safe to bolt onto a live payment flow: a negotiation with
+# ZERO requirements defined behaves exactly as before (mutual lock alone releases funds).
+# The compliance gate only engages once a negotiation actually has requirements attached to
+# it, so nothing already in flight changes behavior.
+# ============================================================================
+
+REQUIREMENT_CATEGORIES = {
+    "platform", "content_format", "post_count", "hashtag", "mention",
+    "link", "deadline", "content_approval", "usage_rights", "exclusivity", "disclosure", "other",
+}
+
+REQUIREMENT_REASON_CODES = {
+    "confirmed", "auto_confirmed_deadline_met", "auto_confirmed_url_match",
+    "missing_evidence", "deadline_missed", "wrong_platform", "wrong_format",
+    "content_removed", "count_short", "waived", "other",
+}
+
+DISPUTE_RESOLUTIONS = {"release", "refund", "partial"}
+
+class DeliverableRequirement(SQLModel, table=True):
+    """One objectively-checkable term of the deal. `expected_value` is always a plain
+    fact — a platform name, a hashtag, an ISO date, a count — never a subjective standard,
+    so two people reading it can only disagree about whether it happened, never what it means."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    negotiation_id: int = Field(index=True)
+    category: str  # one of REQUIREMENT_CATEGORIES
+    label: str  # human-readable statement, e.g. "Must be posted as an Instagram Reel"
+    expected_value: str = Field(default="")  # the fact to check against, e.g. "instagram.com", "2026-09-20T00:00:00", "2"
+    required: bool = Field(default=True)  # only required=True items gate escrow release
+    created_by_role: str
+    created_by_email: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class DeliverableSubmission(SQLModel, table=True):
+    """The influencer's proof-of-work record. A negotiation can have more than one —
+    e.g. a resubmission after an item was marked not-met."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    negotiation_id: int = Field(index=True)
+    submitted_by_email: str
+    proof_urls: str  # newline-separated links to the live posted content
+    notes: str = Field(default="")
+    submitted_at: datetime = Field(default_factory=datetime.utcnow)
+
+class RequirementCheck(SQLModel, table=True):
+    """The one-fact-per-row verdict on a single requirement. Never overwritten — a new
+    review adds a new row, and the most recent row per requirement_id is the active verdict —
+    so the full history of who said what, and when, is always intact for a dispute."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    negotiation_id: int = Field(index=True)
+    requirement_id: int = Field(index=True)
+    submission_id: Optional[int] = Field(default=None)
+    met: bool
+    reason_code: str  # one of REQUIREMENT_REASON_CODES
+    note: str = Field(default="")
+    reviewed_by_role: str  # "sponsor" | "system"
+    reviewed_by_email: str = Field(default="")
+    reviewed_at: datetime = Field(default_factory=datetime.utcnow)
+
+class EscrowDispute(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    negotiation_id: int = Field(index=True)
+    raised_by_email: str
+    raised_by_role: str
+    requirement_id: Optional[int] = Field(default=None)  # None = dispute over the whole deal
+    reason: str
+    status: str = Field(default="open")  # "open" | "resolved_release" | "resolved_refund" | "resolved_partial"
+    resolution_note: str = Field(default="")
+    resolved_by: str = Field(default="")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    resolved_at: Optional[datetime] = Field(default=None)
+
+class Invoice(SQLModel, table=True):
+    """One invoice per negotiation, created the moment a deal is struck (status
+    'issued') and updated in place as real money events happen — never regenerated,
+    so invoice_number stays a stable reference for both sides and for support."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    negotiation_id: int = Field(index=True, unique=True)
+    invoice_number: str = Field(index=True, unique=True)
+    sponsor_email: str
+    sponsor_name: str
+    influencer_email: str
+    influencer_name: str
+    brief: str = Field(default="")
+    currency: str = Field(default="INR")
+    gross_amount: float
+    platform_fee_percent: float = Field(default=0)
+    platform_fee_amount: float = Field(default=0)
+    net_payout_amount: float = Field(default=0)
+    status: str = Field(default="issued")  # issued -> funded -> released | refunded | disputed | void
+    issued_at: datetime = Field(default_factory=datetime.utcnow)
+    funded_at: Optional[datetime] = Field(default=None)
+    released_at: Optional[datetime] = Field(default=None)
+    refunded_at: Optional[datetime] = Field(default=None)
+
+class InvoiceLineItem(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    invoice_id: int = Field(index=True)
+    description: str
+    quantity: float = Field(default=1)
+    unit_amount: float
+    line_total: float
+
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
     migrate_schema()
@@ -340,6 +488,24 @@ def migrate_schema():
         "ALTER TABLE useraccount ADD COLUMN tiktok_handle VARCHAR DEFAULT ''",
         "ALTER TABLE useraccount ADD COLUMN years_active INTEGER DEFAULT 0",
         "ALTER TABLE useraccount ADD COLUMN company_size VARCHAR DEFAULT ''",
+        # --- Sept 2026: severe expansion of account-level data collection ---
+        "ALTER TABLE useraccount ADD COLUMN audience_age_range VARCHAR DEFAULT ''",
+        "ALTER TABLE useraccount ADD COLUMN audience_gender_lean VARCHAR DEFAULT ''",
+        "ALTER TABLE useraccount ADD COLUMN audience_top_locations VARCHAR DEFAULT ''",
+        "ALTER TABLE useraccount ADD COLUMN production_quality_tier VARCHAR DEFAULT ''",
+        "ALTER TABLE useraccount ADD COLUMN posting_frequency_per_week INTEGER DEFAULT 0",
+        "ALTER TABLE useraccount ADD COLUMN portfolio_url VARCHAR DEFAULT ''",
+        "ALTER TABLE useraccount ADD COLUMN past_brand_collabs_count INTEGER DEFAULT 0",
+        "ALTER TABLE useraccount ADD COLUMN is_agency_managed BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE useraccount ADD COLUMN team_size INTEGER DEFAULT 0",
+        "ALTER TABLE useraccount ADD COLUMN payment_terms_accepted VARCHAR DEFAULT ''",
+        "ALTER TABLE useraccount ADD COLUMN content_usage_duration_pref VARCHAR DEFAULT ''",
+        "ALTER TABLE useraccount ADD COLUMN whitelisting_allowed BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE useraccount ADD COLUMN revision_rounds_included INTEGER DEFAULT 0",
+        "ALTER TABLE useraccount ADD COLUMN min_notice_days INTEGER DEFAULT 0",
+        "ALTER TABLE useraccount ADD COLUMN communication_style VARCHAR DEFAULT ''",
+        "ALTER TABLE useraccount ADD COLUMN content_rating VARCHAR DEFAULT ''",
+        "ALTER TABLE useraccount ADD COLUMN company_website VARCHAR DEFAULT ''",
     ]
     with engine.connect() as conn:
         for stmt in migrations:
@@ -471,20 +637,27 @@ def get_current_user_optional(authorization: Optional[str] = Header(None), sessi
 #      usage_rights_required / exclusivity_required are surfaced as disclosed deal terms.
 
 WEIGHTS = {
-    "niche": 17,
-    "budget": 15,
-    "audience_engagement": 12,
-    "reliability": 11,
-    "collab_format": 8,
-    "tone_values": 7,
-    "platforms": 6,
-    "brand_safety": 6,
-    "creative_fit": 5,
-    "languages": 4,
-    "logistics": 4,
-    "location": 3,
+    "niche": 15,
+    "budget": 13,
+    "audience_engagement": 11,
+    "reliability": 10,
+    "collab_format": 7,
+    "tone_values": 6,
+    "platforms": 5,
+    "brand_safety": 5,
+    "creative_fit": 4,
+    "languages": 3,
+    "logistics": 3,
+    "location": 2,
     "verified": 2,
-}  # sums to 100 — see compute_match_breakdown for which factors apply to a given pair
+    "audience_demographics": 8,
+    "content_quality_tier": 3,
+    "payment_terms": 3,
+}  # sums to 100 — see compute_match_breakdown for which factors apply to a given pair.
+# v4 (Sept 2026) shaved 1-2 points off every existing factor to make room for three new
+# account-level factors (audience_demographics, content_quality_tier, payment_terms) fed by
+# the severely expanded UserAccount data collection below — see that class for the full field
+# list and get_account_map() for how it's batch-fetched into the algorithm.
 
 REASON_LABELS = {
     "niche": "Strong category / niche overlap",
@@ -492,7 +665,7 @@ REASON_LABELS = {
     "audience_engagement": "Meets audience & engagement requirements",
     "reliability": "Proven track record on SOCIA",
     "collab_format": "Aligned on collaboration type & content format",
-    "tone_values": "Shared content tone & values",
+    "tone_values": "Shared content tone, values & communication style",
     "platforms": "Active on the same platforms",
     "brand_safety": "No brand-safety conflicts",
     "creative_fit": "Compatible creative control & partnership style",
@@ -500,6 +673,9 @@ REASON_LABELS = {
     "logistics": "Turnaround expectations align",
     "location": "Located in the required market",
     "verified": "SOCIA-verified listing",
+    "audience_demographics": "Audience age, gender & geography fit",
+    "content_quality_tier": "Meets production quality bar",
+    "payment_terms": "Compatible payment terms",
 }
 
 def _tagset(csv: str) -> set:
@@ -564,6 +740,53 @@ def get_reliability_signals(session: Session, emails: set) -> dict:
 
     return signals
 
+def get_account_map(session: Session, emails: set) -> dict:
+    """Batch-fetches UserAccount rows for every listing being scored on the current
+    request, keyed by email — same one-query-not-N pattern as get_reliability_signals,
+    since this now runs on every marketplace page load."""
+    emails = [e for e in emails if e]
+    if not emails:
+        return {}
+    accounts = session.exec(select(UserAccount).where(UserAccount.email.in_(emails))).all()
+    return {a.email: a for a in accounts}
+
+def _format_account_data(account: Optional["UserAccount"], reveal_identity: bool = True) -> Optional[dict]:
+    """Surfaces the severely-expanded account-level data collection on marketplace listings —
+    otherwise all of it stays invisible to the humans it's supposed to help evaluate a match.
+    reveal_identity=False (an anonymous listing) withholds only identity-linkable fields
+    (handles, portfolio URL, website); the demographic/logistics fields aren't identifying
+    on their own and stay visible so the match still means something while browsing anonymously."""
+    if not account:
+        return None
+    data = {
+        "yearsActive": account.years_active,
+        "companySize": account.company_size,
+        "audienceAgeRange": [t.strip() for t in account.audience_age_range.split(",") if t.strip()],
+        "audienceGenderLean": account.audience_gender_lean,
+        "audienceTopLocations": [t.strip() for t in account.audience_top_locations.split(",") if t.strip()],
+        "productionQualityTier": account.production_quality_tier,
+        "postingFrequencyPerWeek": account.posting_frequency_per_week,
+        "pastBrandCollabsCount": account.past_brand_collabs_count,
+        "isAgencyManaged": account.is_agency_managed,
+        "teamSize": account.team_size,
+        "paymentTermsAccepted": [t.strip() for t in account.payment_terms_accepted.split(",") if t.strip()],
+        "contentUsageDurationPref": account.content_usage_duration_pref,
+        "whitelistingAllowed": account.whitelisting_allowed,
+        "revisionRoundsIncluded": account.revision_rounds_included,
+        "minNoticeDays": account.min_notice_days,
+        "communicationStyle": [t.strip() for t in account.communication_style.split(",") if t.strip()],
+        "contentRating": account.content_rating,
+    }
+    if reveal_identity:
+        data.update({
+            "instagramHandle": account.instagram_handle,
+            "youtubeHandle": account.youtube_handle,
+            "tiktokHandle": account.tiktok_handle,
+            "portfolioUrl": account.portfolio_url,
+            "companyWebsite": account.company_website,
+        })
+    return data
+
 def _reliability_score(signal: Optional[dict]) -> float:
     """Returns the FRACTION (0.0-1.0) of the reliability weight earned. A brand-new account
     with no history yet gets a neutral 0.65 — being new is never treated as a strike, but a
@@ -589,11 +812,17 @@ def compute_match_breakdown(
     viewer_listing: Optional["MarketplaceListing"],
     candidate: "MarketplaceListing",
     reliability_signal: Optional[dict] = None,
+    viewer_account: Optional["UserAccount"] = None,
+    candidate_account: Optional["UserAccount"] = None,
 ) -> Optional[dict]:
     """Full transparent scoring breakdown: which factors applied, how many points each
     earned out of its weight, the final 0-100 score, and up to 3 plain-English reasons for
     the match. compute_match_score() below is a thin wrapper around this for callers that
-    only need the number — this is the single source of truth for the algorithm."""
+    only need the number — this is the single source of truth for the algorithm.
+    viewer_account/candidate_account are the UserAccount rows behind each listing (see
+    get_account_map) — optional so old call sites keep working, but every account-level
+    factor below (audience_demographics, content_quality_tier, payment_terms, the
+    communication_style fold-in, the experience bonus) simply doesn't apply without them."""
     if viewer_listing is None:
         return None
 
@@ -601,6 +830,16 @@ def compute_match_breakdown(
     earned = 0.0
     applicable_weight = 0.0
     sponsor, creator = _sponsor_and_creator(viewer_listing, candidate)
+
+    # Map the two UserAccount rows onto whichever side is the sponsor vs. the creator, the
+    # same way `sponsor`/`creator` above map the two LISTINGS — by identity, since
+    # _sponsor_and_creator always returns either (viewer_listing, candidate) or the reverse.
+    if sponsor is viewer_listing:
+        sponsor_account, creator_account = viewer_account, candidate_account
+    elif sponsor is candidate:
+        sponsor_account, creator_account = candidate_account, viewer_account
+    else:
+        sponsor_account, creator_account = None, None
 
     # --- Niche / category overlap ---
     viewer_tags, candidate_tags = _tagset(viewer_listing.niche_tags), _tagset(candidate.niche_tags)
@@ -697,7 +936,9 @@ def compute_match_breakdown(
     else:
         factors["brand_safety"] = {"weight": w, "earned": 0.0, "applicable": False}
 
-    # --- Tone & values: "analytically subjective" fit — scored by overlap, not correctness ---
+    # --- Tone & values: "analytically subjective" fit — scored by overlap, not correctness.
+    # communication_style (account-level) folds in here as a third sub-score rather than its
+    # own weight bucket — it's the same kind of two-sided style-overlap signal as tone/values. ---
     w = WEIGHTS["tone_values"]
     v_tone, c_tone = _tagset(viewer_listing.content_tone), _tagset(candidate.content_tone)
     v_values, c_values = _tagset(viewer_listing.values_tags), _tagset(candidate.values_tags)
@@ -706,6 +947,10 @@ def compute_match_breakdown(
         sub_scores.append(_jaccard(v_tone, c_tone))
     if v_values and c_values:
         sub_scores.append(_jaccard(v_values, c_values))
+    if viewer_account and candidate_account:
+        v_comm, c_comm = _tagset(viewer_account.communication_style), _tagset(candidate_account.communication_style)
+        if v_comm and c_comm:
+            sub_scores.append(_jaccard(v_comm, c_comm))
     if sub_scores:
         applicable_weight += w
         pts = (sum(sub_scores) / len(sub_scores)) * w
@@ -751,6 +996,65 @@ def compute_match_breakdown(
     else:
         factors["logistics"] = {"weight": w, "earned": 0.0, "applicable": False}
 
+    # --- Audience demographics: sponsor's target age range / gender lean / top locations vs.
+    # the creator's actual audience composition. Three independent sub-checks, averaged over
+    # whichever ones both sides actually filled in — same "average of applicable sub-scores"
+    # shape as collab_format and tone_values above. ---
+    w = WEIGHTS["audience_demographics"]
+    if sponsor_account and creator_account:
+        sub_scores = []
+        v_age, c_age = _tagset(sponsor_account.audience_age_range), _tagset(creator_account.audience_age_range)
+        if v_age and c_age:
+            sub_scores.append(_jaccard(v_age, c_age))
+        if sponsor_account.audience_gender_lean:
+            sub_scores.append(1.0 if sponsor_account.audience_gender_lean == creator_account.audience_gender_lean else 0.3)
+        v_loc, c_loc = _tagset(sponsor_account.audience_top_locations), _tagset(creator_account.audience_top_locations)
+        if v_loc and c_loc:
+            sub_scores.append(_jaccard(v_loc, c_loc))
+        if sub_scores:
+            applicable_weight += w
+            pts = (sum(sub_scores) / len(sub_scores)) * w
+            earned += pts
+            factors["audience_demographics"] = {"weight": w, "earned": pts, "applicable": True}
+        else:
+            factors["audience_demographics"] = {"weight": w, "earned": 0.0, "applicable": False}
+    else:
+        factors["audience_demographics"] = {"weight": w, "earned": 0.0, "applicable": False}
+
+    # --- Content quality tier: sponsor's stated minimum production bar vs. the creator's
+    # actual tier — directional like audience_engagement (meets-or-exceeds), not closeness. ---
+    w = WEIGHTS["content_quality_tier"]
+    QUALITY_TIER_RANK = {"phone": 1, "prosumer": 2, "studio": 3}
+    if sponsor_account and creator_account and sponsor_account.production_quality_tier and creator_account.production_quality_tier:
+        sponsor_min = QUALITY_TIER_RANK.get(sponsor_account.production_quality_tier, 0)
+        creator_tier = QUALITY_TIER_RANK.get(creator_account.production_quality_tier, 0)
+        if sponsor_min and creator_tier:
+            applicable_weight += w
+            fraction = 1.0 if creator_tier >= sponsor_min else max(0.0, 1 - (sponsor_min - creator_tier) / 2)
+            pts = fraction * w
+            earned += pts
+            factors["content_quality_tier"] = {"weight": w, "earned": pts, "applicable": True}
+        else:
+            factors["content_quality_tier"] = {"weight": w, "earned": 0.0, "applicable": False}
+    else:
+        factors["content_quality_tier"] = {"weight": w, "earned": 0.0, "applicable": False}
+
+    # --- Payment terms: overlap between what the sponsor offers and what the creator accepts.
+    # Same field (payment_terms_accepted) on both sides, role-dependent meaning — like
+    # audience_size/engagement_rate on MarketplaceListing. ---
+    w = WEIGHTS["payment_terms"]
+    if sponsor_account and creator_account:
+        v_terms, c_terms = _tagset(sponsor_account.payment_terms_accepted), _tagset(creator_account.payment_terms_accepted)
+        if v_terms and c_terms:
+            applicable_weight += w
+            pts = _jaccard(v_terms, c_terms) * w
+            earned += pts
+            factors["payment_terms"] = {"weight": w, "earned": pts, "applicable": True}
+        else:
+            factors["payment_terms"] = {"weight": w, "earned": 0.0, "applicable": False}
+    else:
+        factors["payment_terms"] = {"weight": w, "earned": 0.0, "applicable": False}
+
     # --- Content language overlap ---
     viewer_langs, candidate_langs = _tagset(viewer_listing.content_languages), _tagset(candidate.content_languages)
     if viewer_langs and candidate_langs:
@@ -782,6 +1086,12 @@ def compute_match_breakdown(
     viewer_interests, candidate_interests = _tagset(viewer_listing.interests), _tagset(candidate.interests)
     interest_bonus = _jaccard(viewer_interests, candidate_interests) * 5 if (viewer_interests and candidate_interests) else 0.0
 
+    # --- Experience: a small, capped, never-subtracted trust nudge from the creator's
+    # self-reported years_active — company_size has no natural creator-side counterpart, so
+    # it stays disclosed-but-unscored for now (same honest treatment usage_rights_required /
+    # exclusivity_required get above), same reasoning that kept it out of v3. ---
+    experience_bonus = min(creator_account.years_active, 5) * 0.6 if creator_account else 0.0
+
     # --- Coverage / confidence adjustment ---
     # A raw earned/applicable_weight ratio is only as trustworthy as how much of the total
     # 100-point weight was actually evaluable. Two nearly-blank listings can otherwise land
@@ -795,7 +1105,7 @@ def compute_match_breakdown(
     raw_base = (earned / applicable_weight) * 100 if applicable_weight > 0 else 0.0
     NEUTRAL_MIDPOINT = 50
     confidence_adjusted = raw_base * coverage + NEUTRAL_MIDPOINT * (1 - coverage)
-    score = round(min(confidence_adjusted + interest_bonus, 100))
+    score = round(min(confidence_adjusted + interest_bonus + experience_bonus, 100))
 
     reasons = [
         REASON_LABELS[name] for name, f in sorted(factors.items(), key=lambda kv: -kv[1]["weight"])
@@ -807,6 +1117,7 @@ def compute_match_breakdown(
         "factors": factors,
         "reasons": reasons,
         "interest_bonus": interest_bonus,
+        "experience_bonus": experience_bonus,
         "applicable_weight": applicable_weight,
         "coverage": round(coverage, 3),
         "lowConfidence": coverage < 0.5,
@@ -816,8 +1127,10 @@ def compute_match_score(
     viewer_listing: Optional["MarketplaceListing"],
     candidate: "MarketplaceListing",
     reliability_signal: Optional[dict] = None,
+    viewer_account: Optional["UserAccount"] = None,
+    candidate_account: Optional["UserAccount"] = None,
 ) -> Optional[int]:
-    result = compute_match_breakdown(viewer_listing, candidate, reliability_signal)
+    result = compute_match_breakdown(viewer_listing, candidate, reliability_signal, viewer_account, candidate_account)
     return result["score"] if result else None
 
 # --- HELPER: SECURE PASSWORD HASHING (PBKDF2-HMAC-SHA256, stdlib only) ---
@@ -873,6 +1186,53 @@ def enforce_rate_limit(key: str, max_attempts: int, window_seconds: int):
         raise HTTPException(status_code=429, detail="Too many attempts. Please wait before trying again.")
     bucket.append(now)
     _rate_limit_buckets[key] = bucket
+
+# --- HELPER: PER-ACCOUNT HARD LOGIN LOCKOUT (distinct from the soft rate-limiter above) ---
+# enforce_rate_limit above throttles request VOLUME (any 8-in-10-minutes burst, regardless of
+# whether the credential was right or wrong). This is a separate, harder gate: it counts only
+# WRONG password / WRONG login-OTP attempts against one specific account (not IP), and hard-locks
+# that account after 3 -- exactly mirroring the admin panel's lockout, but per-account rather than
+# global since each user has their own separate credential. This protects the account that gates
+# billing/invoice access (both endpoints require this same JWT login).
+_login_lockout = {}  # email(lowercased) -> {"attempts": int, "locked_until": datetime|None}
+LOGIN_MAX_ATTEMPTS = 3
+LOGIN_LOCKOUT_MINUTES = 30
+
+def _check_login_lockout(session: Session, email: str):
+    key = (email or "").strip().lower()
+    entry = _login_lockout.get(key)
+    locked_until = entry.get("locked_until") if entry else None
+    if locked_until and datetime.utcnow() < locked_until:
+        remaining_seconds = int((locked_until - datetime.utcnow()).total_seconds())
+        remaining_minutes = max(1, (remaining_seconds // 60) + 1)
+        log_audit(session, email, "login_blocked_by_lockout", f"{remaining_minutes} min remaining")
+        raise HTTPException(
+            status_code=423,
+            detail=f"Too many failed attempts. This account is locked for {remaining_minutes} minute(s)."
+        )
+
+def _register_login_failure(session: Session, email: str, reason: str):
+    """Increments the wrong-password-or-wrong-OTP counter for one account and hard-locks
+    it for LOGIN_LOCKOUT_MINUTES once LOGIN_MAX_ATTEMPTS is reached. Raises 423 itself
+    when the lockout triggers; otherwise returns the remaining attempt count."""
+    key = (email or "").strip().lower()
+    entry = _login_lockout.setdefault(key, {"attempts": 0, "locked_until": None})
+    entry["attempts"] += 1
+    attempts_used = entry["attempts"]
+    log_audit(session, email, "login_attempt_failed", f"{reason}, attempt {attempts_used}/{LOGIN_MAX_ATTEMPTS}")
+
+    if attempts_used >= LOGIN_MAX_ATTEMPTS:
+        entry["attempts"] = 0
+        entry["locked_until"] = datetime.utcnow() + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
+        log_audit(session, email, "login_lockout_triggered", f"locked {LOGIN_LOCKOUT_MINUTES} min after {LOGIN_MAX_ATTEMPTS} failed attempts ({reason})")
+        raise HTTPException(
+            status_code=423,
+            detail=f"Too many failed attempts ({LOGIN_MAX_ATTEMPTS}/{LOGIN_MAX_ATTEMPTS}). This account is locked for {LOGIN_LOCKOUT_MINUTES} minutes."
+        )
+    return LOGIN_MAX_ATTEMPTS - attempts_used
+
+def _clear_login_lockout(email: str):
+    _login_lockout.pop((email or "").strip().lower(), None)
 
 # --- HELPER: GOOGLE WORKSPACE SMTP EMAIL DISPATCHER (sociacreator@contactsocia.com) ---
 def send_otp_email(recipient_email: str, otp_code: str):
@@ -946,6 +1306,93 @@ def log_audit(session: Session, email: str, action: str, detail: str = ""):
     session.add(entry)
     session.commit()
 
+def compute_compliance(negotiation_id: int, session: Session) -> dict:
+    """The entire 'objective condition reader': reads the requirement checklist plus the
+    single most recent RequirementCheck per item, and produces one deterministic verdict.
+    A requirement with no recorded check counts as NOT met — nothing is ever assumed
+    satisfied by silence — and every number returned here traces back to a stored row
+    (a timestamp, a fixed reason code, a named reviewer), never an inference."""
+    requirements = session.exec(
+        select(DeliverableRequirement).where(DeliverableRequirement.negotiation_id == negotiation_id)
+    ).all()
+    checks = session.exec(
+        select(RequirementCheck).where(RequirementCheck.negotiation_id == negotiation_id)
+    ).all()
+
+    latest_check = {}
+    for c in checks:
+        prior = latest_check.get(c.requirement_id)
+        if not prior or c.reviewed_at >= prior.reviewed_at:
+            latest_check[c.requirement_id] = c
+
+    items = []
+    required_total = 0
+    required_met = 0
+    for r in requirements:
+        chk = latest_check.get(r.id)
+        met = bool(chk and chk.met)
+        if r.required:
+            required_total += 1
+            if met:
+                required_met += 1
+        items.append({
+            "requirement_id": r.id,
+            "category": r.category,
+            "label": r.label,
+            "expected_value": r.expected_value,
+            "required": r.required,
+            "met": met,
+            "reason_code": chk.reason_code if chk else None,
+            "note": chk.note if chk else "",
+            "reviewed_by_role": chk.reviewed_by_role if chk else None,
+            "reviewed_at": chk.reviewed_at if chk else None,
+        })
+
+    return {
+        "items": items,
+        "has_requirements": len(requirements) > 0,
+        "required_total": required_total,
+        "required_met": required_met,
+        "all_required_met": required_total == 0 or required_met == required_total,
+        "compliance_percent": round((required_met / required_total) * 100, 1) if required_total else 100.0,
+    }
+
+def _auto_evaluate_submission(negotiation_id: int, submission: "DeliverableSubmission", session: Session):
+    """Auto-fills exactly the two categories that can be checked with zero interpretation:
+    a deadline against a timestamp, and a platform token against the submitted URLs. Every
+    other category is deliberately left for the sponsor to confirm by hand — a real
+    'objective' check is one built from data actually available, not a fake shortcut."""
+    requirements = session.exec(
+        select(DeliverableRequirement).where(DeliverableRequirement.negotiation_id == negotiation_id)
+    ).all()
+    urls_lower = (submission.proof_urls or "").lower()
+    for r in requirements:
+        if r.category == "deadline" and r.expected_value.strip():
+            try:
+                deadline = datetime.fromisoformat(r.expected_value.strip())
+            except ValueError:
+                continue
+            met = submission.submitted_at <= deadline
+            session.add(RequirementCheck(
+                negotiation_id=negotiation_id, requirement_id=r.id, submission_id=submission.id,
+                met=met, reason_code="auto_confirmed_deadline_met" if met else "deadline_missed",
+                note=f"Auto-evaluated: submitted {submission.submitted_at.isoformat()} against deadline {r.expected_value.strip()}.",
+                reviewed_by_role="system",
+            ))
+        elif r.category == "platform" and r.expected_value.strip():
+            token = r.expected_value.strip().lower()
+            if token in urls_lower:
+                session.add(RequirementCheck(
+                    negotiation_id=negotiation_id, requirement_id=r.id, submission_id=submission.id,
+                    met=True, reason_code="auto_confirmed_url_match",
+                    note=f"Auto-evaluated: a submitted proof URL contains '{r.expected_value.strip()}'.",
+                    reviewed_by_role="system",
+                ))
+    session.commit()
+
+def next_invoice_number(negotiation_id: int) -> str:
+    return f"SOCIA-INV-{negotiation_id:06d}"
+
 # --- SCHEMAS ---
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -978,6 +1425,24 @@ class UserSettingsUpdate(BaseModel):
     tiktok_handle: Optional[str] = None
     years_active: Optional[int] = None
     company_size: Optional[str] = None
+    # --- Severely expanded account-level matching data (Sept 2026) ---
+    audience_age_range: Optional[List[str]] = None
+    audience_gender_lean: Optional[str] = None
+    audience_top_locations: Optional[List[str]] = None
+    production_quality_tier: Optional[str] = None
+    posting_frequency_per_week: Optional[int] = None
+    portfolio_url: Optional[str] = None
+    past_brand_collabs_count: Optional[int] = None
+    is_agency_managed: Optional[bool] = None
+    team_size: Optional[int] = None
+    payment_terms_accepted: Optional[List[str]] = None
+    content_usage_duration_pref: Optional[str] = None
+    whitelisting_allowed: Optional[bool] = None
+    revision_rounds_included: Optional[int] = None
+    min_notice_days: Optional[int] = None
+    communication_style: Optional[List[str]] = None
+    content_rating: Optional[str] = None
+    company_website: Optional[str] = None
 
 class ListingCreate(BaseModel):
     name: str
@@ -1032,6 +1497,33 @@ class NegotiationConditionCreate(BaseModel):
 
 class NegotiationLockUpdate(BaseModel):
     locked: bool
+
+class DeliverableRequirementCreate(BaseModel):
+    category: str
+    label: str
+    expected_value: str = ""
+    required: bool = True
+
+class DeliverableSubmissionCreate(BaseModel):
+    proof_urls: str
+    notes: str = ""
+
+class RequirementReviewItem(BaseModel):
+    requirement_id: int
+    met: bool
+    reason_code: str
+    note: str = ""
+
+class DeliverableReviewSubmit(BaseModel):
+    reviews: List[RequirementReviewItem]
+
+class DisputeCreate(BaseModel):
+    reason: str
+    requirement_id: Optional[int] = None
+
+class DisputeResolve(BaseModel):
+    resolution: str  # "release" | "refund" | "partial"
+    resolution_note: str = ""
 
 class SupportTicketCreate(BaseModel):
     subject: str
@@ -1137,12 +1629,15 @@ def login_step1_password(form_data: OAuth2PasswordRequestForm = Depends(), backg
     instead triggers a 2FA OTP to the user's email. The token is only issued after
     that code is verified via /auth/verify-login-otp."""
     enforce_rate_limit(f"login:{form_data.username}", max_attempts=8, window_seconds=600)
+    _check_login_lockout(session, form_data.username)
+
     user = session.exec(select(UserAccount).where(UserAccount.email == form_data.username)).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         log_audit(session, form_data.username, "login_failed", "Incorrect credentials")
+        remaining_attempts = _register_login_failure(session, form_data.username, "wrong password")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail=f"Incorrect username or password. {remaining_attempts} attempt(s) remaining before this account locks.",
             headers={"WWW-Authenticate": "Bearer"},
         )
     if not user.is_verified:
@@ -1150,6 +1645,12 @@ def login_step1_password(form_data: OAuth2PasswordRequestForm = Depends(), backg
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account pending email verification. Please complete OTP verification first."
         )
+
+    # Correct password -> the wrong-password counter no longer matters; a wrong 2FA
+    # code from here still counts against the same lockout via _register_login_failure below.
+    entry = _login_lockout.get(form_data.username.strip().lower())
+    if entry:
+        entry["attempts"] = 0
 
     login_otp = str(random.randint(100000, 999999))
     user.otp_code = login_otp
@@ -1169,18 +1670,22 @@ class VerifyLoginOTPRequest(BaseModel):
 def login_step2_verify_otp(payload: VerifyLoginOTPRequest, session: Session = Depends(get_session)):
     """Step 2 of login: verifies the 2FA code and issues the real access token."""
     enforce_rate_limit(f"login_2fa:{payload.email}", max_attempts=8, window_seconds=600)
+    _check_login_lockout(session, payload.email)
+
     user = session.exec(select(UserAccount).where(UserAccount.email == payload.email)).first()
     if not user:
         raise HTTPException(status_code=404, detail="User account not found.")
 
     if user.otp_purpose != "login_2fa" or user.otp_code != payload.otp_code:
         log_audit(session, payload.email, "login_2fa_failed")
-        raise HTTPException(status_code=400, detail="Invalid or expired 2FA code.")
+        remaining_attempts = _register_login_failure(session, payload.email, "wrong login OTP")
+        raise HTTPException(status_code=400, detail=f"Invalid or expired 2FA code. {remaining_attempts} attempt(s) remaining before this account locks.")
 
     user.otp_code = None
     user.otp_purpose = None
     session.add(user)
     session.commit()
+    _clear_login_lockout(user.email)
     log_audit(session, user.email, "login_success")
 
     return {
@@ -1226,7 +1731,24 @@ def get_account_settings(current_user: UserAccount = Depends(get_current_user)):
             "youtube_handle": user.youtube_handle,
             "tiktok_handle": user.tiktok_handle,
             "years_active": user.years_active,
-            "company_size": user.company_size
+            "company_size": user.company_size,
+            "audience_age_range": [t.strip() for t in user.audience_age_range.split(",") if t.strip()],
+            "audience_gender_lean": user.audience_gender_lean,
+            "audience_top_locations": [t.strip() for t in user.audience_top_locations.split(",") if t.strip()],
+            "production_quality_tier": user.production_quality_tier,
+            "posting_frequency_per_week": user.posting_frequency_per_week,
+            "portfolio_url": user.portfolio_url,
+            "past_brand_collabs_count": user.past_brand_collabs_count,
+            "is_agency_managed": user.is_agency_managed,
+            "team_size": user.team_size,
+            "payment_terms_accepted": [t.strip() for t in user.payment_terms_accepted.split(",") if t.strip()],
+            "content_usage_duration_pref": user.content_usage_duration_pref,
+            "whitelisting_allowed": user.whitelisting_allowed,
+            "revision_rounds_included": user.revision_rounds_included,
+            "min_notice_days": user.min_notice_days,
+            "communication_style": [t.strip() for t in user.communication_style.split(",") if t.strip()],
+            "content_rating": user.content_rating,
+            "company_website": user.company_website,
         }
     }
 
@@ -1262,6 +1784,50 @@ def update_account_settings(payload: UserSettingsUpdate, session: Session = Depe
         user.years_active = payload.years_active
     if payload.company_size is not None:
         user.company_size = payload.company_size
+
+    # --- Severely expanded account-level matching data (Sept 2026) ---
+    if payload.audience_gender_lean is not None:
+        if payload.audience_gender_lean not in ("", "balanced", "majority_female", "majority_male", "majority_other"):
+            raise HTTPException(status_code=400, detail="Invalid audience_gender_lean value.")
+        user.audience_gender_lean = payload.audience_gender_lean
+    if payload.production_quality_tier is not None:
+        if payload.production_quality_tier not in ("", "phone", "prosumer", "studio"):
+            raise HTTPException(status_code=400, detail="Invalid production_quality_tier value.")
+        user.production_quality_tier = payload.production_quality_tier
+    if payload.content_usage_duration_pref is not None:
+        if payload.content_usage_duration_pref not in ("", "30_days", "90_days", "1_year", "perpetual"):
+            raise HTTPException(status_code=400, detail="Invalid content_usage_duration_pref value.")
+        user.content_usage_duration_pref = payload.content_usage_duration_pref
+    if payload.content_rating is not None:
+        if payload.content_rating not in ("", "general", "mature"):
+            raise HTTPException(status_code=400, detail="Invalid content_rating value.")
+        user.content_rating = payload.content_rating
+    if payload.audience_age_range is not None:
+        user.audience_age_range = ", ".join(t.strip() for t in payload.audience_age_range if t.strip())
+    if payload.audience_top_locations is not None:
+        user.audience_top_locations = ", ".join(t.strip() for t in payload.audience_top_locations if t.strip())
+    if payload.payment_terms_accepted is not None:
+        user.payment_terms_accepted = ", ".join(t.strip() for t in payload.payment_terms_accepted if t.strip())
+    if payload.communication_style is not None:
+        user.communication_style = ", ".join(t.strip() for t in payload.communication_style if t.strip())
+    if payload.posting_frequency_per_week is not None:
+        user.posting_frequency_per_week = max(0, payload.posting_frequency_per_week)
+    if payload.portfolio_url is not None:
+        user.portfolio_url = payload.portfolio_url.strip()
+    if payload.past_brand_collabs_count is not None:
+        user.past_brand_collabs_count = max(0, payload.past_brand_collabs_count)
+    if payload.is_agency_managed is not None:
+        user.is_agency_managed = payload.is_agency_managed
+    if payload.team_size is not None:
+        user.team_size = max(0, payload.team_size)
+    if payload.whitelisting_allowed is not None:
+        user.whitelisting_allowed = payload.whitelisting_allowed
+    if payload.revision_rounds_included is not None:
+        user.revision_rounds_included = max(0, payload.revision_rounds_included)
+    if payload.min_notice_days is not None:
+        user.min_notice_days = max(0, payload.min_notice_days)
+    if payload.company_website is not None:
+        user.company_website = payload.company_website.strip()
 
     session.add(user)
     session.commit()
@@ -1414,10 +1980,15 @@ def get_marketplace_listings(role: str, session: Session = Depends(get_session),
     if viewer_listing:
         all_emails.add(viewer_listing.contact)
     reliability_map = get_reliability_signals(session, all_emails)
+    account_map = get_account_map(session, all_emails)
 
     formatted = []
     for r in results:
-        breakdown = compute_match_breakdown(viewer_listing, r, reliability_map.get(r.contact))
+        breakdown = compute_match_breakdown(
+            viewer_listing, r, reliability_map.get(r.contact),
+            account_map.get(viewer_listing.contact) if viewer_listing else None,
+            account_map.get(r.contact),
+        )
         is_own_listing = current_user and r.contact == current_user.email
         masked = r.is_anonymous and not is_own_listing
         formatted.append({
@@ -1454,7 +2025,8 @@ def get_marketplace_listings(role: str, session: Session = Depends(get_session),
             "valuesTags": [t.strip() for t in r.values_tags.split(",") if t.strip()],
             "creativeControlPref": r.creative_control_pref,
             "partnershipLengthPref": r.partnership_length_pref,
-            "verified": r.verified
+            "verified": r.verified,
+            "accountData": _format_account_data(account_map.get(r.contact), reveal_identity=not masked),
         })
     formatted.sort(key=lambda x: (x["match"] is None, -(x["match"] or 0)))
     return formatted
@@ -1605,8 +2177,29 @@ def respond_to_pitch(pitch_id: int, payload: PitchRespond, session: Session = De
             negotiation_id=negotiation.id, sender_name="System",
             text=f"Negotiation channel established between {sponsor_name} and {influencer_name}. Escrow locked at ${pitch.amount}."
         ))
+
+        # A billing record exists the moment a deal is struck, not only once money moves —
+        # this is what makes "billing history" mean something for a deal still in negotiation.
+        invoice = Invoice(
+            negotiation_id=negotiation.id,
+            invoice_number=next_invoice_number(negotiation.id),
+            sponsor_email=sponsor_email, sponsor_name=sponsor_name,
+            influencer_email=influencer_email, influencer_name=influencer_name,
+            brief=pitch.brief, currency="INR",
+            gross_amount=pitch.amount,
+            net_payout_amount=pitch.amount,  # placeholder until funding computes the real fee split
+            status="issued",
+        )
+        session.add(invoice)
         session.commit()
-        return {"status": "success", "message": "Pitch accepted. Negotiation opened.", "negotiation_id": negotiation.id}
+        session.refresh(invoice)
+        session.add(InvoiceLineItem(
+            invoice_id=invoice.id,
+            description=(pitch.brief.strip() or "Sponsorship deliverable")[:500],
+            quantity=1, unit_amount=pitch.amount, line_total=pitch.amount,
+        ))
+        session.commit()
+        return {"status": "success", "message": "Pitch accepted. Negotiation opened.", "negotiation_id": negotiation.id, "invoice_number": invoice.invoice_number}
     else:
         pitch.status = "Rejected"
         session.add(pitch)
@@ -1725,6 +2318,222 @@ def set_negotiation_lock(negotiation_id: int, payload: NegotiationLockUpdate, se
     return {"status": "success", "sponsor_locked": neg.sponsor_locked, "influencer_locked": neg.influencer_locked}
 
 
+# --- DELIVERABLE REQUIREMENTS: the objective, structured checklist ---
+def _require_participant(neg: Negotiation, current_user: UserAccount) -> str:
+    if current_user.email == neg.sponsor_email:
+        return "sponsor"
+    if current_user.email == neg.influencer_email:
+        return "influencer"
+    raise HTTPException(status_code=403, detail="Not a participant in this negotiation.")
+
+@app.get("/api/negotiations/{negotiation_id}/requirements")
+def get_deliverable_requirements(negotiation_id: int, session: Session = Depends(get_session), current_user: UserAccount = Depends(get_current_user)):
+    neg = session.get(Negotiation, negotiation_id)
+    if not neg:
+        raise HTTPException(status_code=404, detail="Negotiation not found.")
+    _require_participant(neg, current_user)
+    return session.exec(select(DeliverableRequirement).where(DeliverableRequirement.negotiation_id == negotiation_id)).all()
+
+@app.post("/api/negotiations/{negotiation_id}/requirements")
+def add_deliverable_requirement(negotiation_id: int, payload: DeliverableRequirementCreate, session: Session = Depends(get_session), current_user: UserAccount = Depends(get_current_user)):
+    neg = session.get(Negotiation, negotiation_id)
+    if not neg:
+        raise HTTPException(status_code=404, detail="Negotiation not found.")
+    caller_role = _require_participant(neg, current_user)
+    if payload.category not in REQUIREMENT_CATEGORIES:
+        raise HTTPException(status_code=400, detail=f"Invalid category. Must be one of: {', '.join(sorted(REQUIREMENT_CATEGORIES))}")
+    if not payload.label.strip():
+        raise HTTPException(status_code=400, detail="A requirement needs a label describing what's required.")
+
+    req = DeliverableRequirement(
+        negotiation_id=negotiation_id, category=payload.category, label=payload.label.strip(),
+        expected_value=payload.expected_value.strip(), required=payload.required,
+        created_by_role=caller_role, created_by_email=current_user.email,
+    )
+    session.add(req)
+    neg.sponsor_locked = False
+    neg.influencer_locked = False
+    session.add(neg)
+    session.add(NegotiationMessage(
+        negotiation_id=negotiation_id, sender_name="System",
+        text=f"Objective deliverable requirement added by {caller_role.upper()}: \"{payload.label.strip()}\"" + (f" (expects: {payload.expected_value.strip()})" if payload.expected_value.strip() else "") + " — locks reset."
+    ))
+    session.commit()
+    session.refresh(req)
+    return req
+
+@app.delete("/api/negotiations/{negotiation_id}/requirements/{requirement_id}")
+def delete_deliverable_requirement(negotiation_id: int, requirement_id: int, session: Session = Depends(get_session), current_user: UserAccount = Depends(get_current_user)):
+    neg = session.get(Negotiation, negotiation_id)
+    if not neg:
+        raise HTTPException(status_code=404, detail="Negotiation not found.")
+    caller_role = _require_participant(neg, current_user)
+    req = session.get(DeliverableRequirement, requirement_id)
+    if not req or req.negotiation_id != negotiation_id:
+        raise HTTPException(status_code=404, detail="Requirement not found.")
+    if req.created_by_role != caller_role:
+        raise HTTPException(status_code=403, detail="You can only remove requirements your role introduced.")
+
+    removed_label = req.label
+    session.delete(req)
+    neg.sponsor_locked = False
+    neg.influencer_locked = False
+    session.add(neg)
+    session.add(NegotiationMessage(
+        negotiation_id=negotiation_id, sender_name="System",
+        text=f"Requirement removed by {caller_role.upper()}: \"{removed_label}\". Mutual re-lock required."
+    ))
+    session.commit()
+    return {"status": "success"}
+
+# --- DELIVERABLE SUBMISSION + OBJECTIVE COMPLIANCE REVIEW ---
+@app.get("/api/negotiations/{negotiation_id}/compliance")
+def get_negotiation_compliance(negotiation_id: int, session: Session = Depends(get_session), current_user: UserAccount = Depends(get_current_user)):
+    neg = session.get(Negotiation, negotiation_id)
+    if not neg:
+        raise HTTPException(status_code=404, detail="Negotiation not found.")
+    _require_participant(neg, current_user)
+    return compute_compliance(negotiation_id, session)
+
+@app.get("/api/negotiations/{negotiation_id}/deliverables")
+def get_deliverable_submissions(negotiation_id: int, session: Session = Depends(get_session), current_user: UserAccount = Depends(get_current_user)):
+    neg = session.get(Negotiation, negotiation_id)
+    if not neg:
+        raise HTTPException(status_code=404, detail="Negotiation not found.")
+    _require_participant(neg, current_user)
+    submissions = session.exec(
+        select(DeliverableSubmission).where(DeliverableSubmission.negotiation_id == negotiation_id)
+    ).all()
+    return {"submissions": submissions, "compliance": compute_compliance(negotiation_id, session)}
+
+@app.post("/api/negotiations/{negotiation_id}/deliverables")
+def submit_deliverable(negotiation_id: int, payload: DeliverableSubmissionCreate, session: Session = Depends(get_session), current_user: UserAccount = Depends(get_current_user)):
+    neg = session.get(Negotiation, negotiation_id)
+    if not neg:
+        raise HTTPException(status_code=404, detail="Negotiation not found.")
+    if current_user.email != neg.influencer_email:
+        raise HTTPException(status_code=403, detail="Only the influencer on this deal can submit deliverable proof.")
+    if not payload.proof_urls.strip():
+        raise HTTPException(status_code=400, detail="At least one proof URL is required (the live link to the posted content).")
+
+    sub = DeliverableSubmission(
+        negotiation_id=negotiation_id, submitted_by_email=current_user.email,
+        proof_urls=payload.proof_urls.strip(), notes=payload.notes.strip(),
+    )
+    session.add(sub)
+    session.commit()
+    session.refresh(sub)
+    _auto_evaluate_submission(negotiation_id, sub, session)
+    session.add(NegotiationMessage(
+        negotiation_id=negotiation_id, sender_name="System",
+        text=f"{current_user.display_name} submitted deliverable proof for review."
+    ))
+    log_audit(session, current_user.email, "deliverable_submitted", f"negotiation_id={negotiation_id} submission_id={sub.id}")
+    session.commit()
+    return {"submission": sub, "compliance": compute_compliance(negotiation_id, session)}
+
+@app.post("/api/negotiations/{negotiation_id}/deliverables/review")
+def review_deliverables(negotiation_id: int, payload: DeliverableReviewSubmit, session: Session = Depends(get_session), current_user: UserAccount = Depends(get_current_user)):
+    """The sponsor's per-item verdict — the human half of the objective check. Each item
+    gets exactly one of a fixed set of reason codes, never free-form text as the actual
+    verdict, so a later dispute reads as data instead of an argument."""
+    neg = session.get(Negotiation, negotiation_id)
+    if not neg:
+        raise HTTPException(status_code=404, detail="Negotiation not found.")
+    if current_user.email != neg.sponsor_email:
+        raise HTTPException(status_code=403, detail="Only the sponsor on this deal can review deliverable compliance.")
+    if not payload.reviews:
+        raise HTTPException(status_code=400, detail="No review items provided.")
+
+    for item in payload.reviews:
+        req = session.get(DeliverableRequirement, item.requirement_id)
+        if not req or req.negotiation_id != negotiation_id:
+            raise HTTPException(status_code=404, detail=f"Requirement {item.requirement_id} not found on this negotiation.")
+        if item.reason_code not in REQUIREMENT_REASON_CODES:
+            raise HTTPException(status_code=400, detail=f"Invalid reason_code. Must be one of: {', '.join(sorted(REQUIREMENT_REASON_CODES))}")
+        session.add(RequirementCheck(
+            negotiation_id=negotiation_id, requirement_id=item.requirement_id, met=item.met,
+            reason_code=item.reason_code, note=item.note.strip(),
+            reviewed_by_role="sponsor", reviewed_by_email=current_user.email,
+        ))
+
+    session.add(NegotiationMessage(
+        negotiation_id=negotiation_id, sender_name="System",
+        text=f"SPONSOR completed deliverable review ({len(payload.reviews)} item(s))."
+    ))
+    session.commit()
+    log_audit(session, current_user.email, "deliverable_review_submitted", f"negotiation_id={negotiation_id} items={len(payload.reviews)}")
+
+    # If both sides already locked and escrow is funded, a completed review can be exactly
+    # what was blocking release — re-check now rather than waiting on another lock toggle.
+    release_escrow_if_ready(negotiation_id, session)
+    return {"status": "success", "compliance": compute_compliance(negotiation_id, session)}
+
+# --- ESCROW DISPUTES ---
+@app.post("/api/negotiations/{negotiation_id}/disputes")
+def raise_dispute(negotiation_id: int, payload: DisputeCreate, session: Session = Depends(get_session), current_user: UserAccount = Depends(get_current_user)):
+    neg = session.get(Negotiation, negotiation_id)
+    if not neg:
+        raise HTTPException(status_code=404, detail="Negotiation not found.")
+    caller_role = _require_participant(neg, current_user)
+    if not payload.reason.strip():
+        raise HTTPException(status_code=400, detail="A reason is required to raise a dispute.")
+
+    payment = session.exec(select(EscrowPayment).where(EscrowPayment.negotiation_id == negotiation_id)).first()
+    if not payment or payment.status not in ("funded", "pending_review"):
+        raise HTTPException(status_code=400, detail="A dispute can only be raised on funded escrow awaiting release.")
+
+    dispute = EscrowDispute(
+        negotiation_id=negotiation_id, raised_by_email=current_user.email, raised_by_role=caller_role,
+        requirement_id=payload.requirement_id, reason=payload.reason.strip(),
+    )
+    session.add(dispute)
+    payment.status = "disputed"
+    session.add(payment)
+    invoice = session.exec(select(Invoice).where(Invoice.negotiation_id == negotiation_id)).first()
+    if invoice:
+        invoice.status = "disputed"
+        session.add(invoice)
+    session.add(NegotiationMessage(
+        negotiation_id=negotiation_id, sender_name="System",
+        text=f"{caller_role.upper()} raised a dispute: \"{payload.reason.strip()}\". Escrow is held pending admin review."
+    ))
+    session.commit()
+    session.refresh(dispute)
+    log_audit(session, current_user.email, "escrow_dispute_raised", f"negotiation_id={negotiation_id} dispute_id={dispute.id}")
+    return dispute
+
+@app.get("/api/negotiations/{negotiation_id}/disputes")
+def get_negotiation_disputes(negotiation_id: int, session: Session = Depends(get_session), current_user: UserAccount = Depends(get_current_user)):
+    neg = session.get(Negotiation, negotiation_id)
+    if not neg:
+        raise HTTPException(status_code=404, detail="Negotiation not found.")
+    _require_participant(neg, current_user)
+    return session.exec(select(EscrowDispute).where(EscrowDispute.negotiation_id == negotiation_id)).all()
+
+# --- INVOICING & BILLING ---
+@app.get("/api/negotiations/{negotiation_id}/invoice")
+def get_negotiation_invoice(negotiation_id: int, session: Session = Depends(get_session), current_user: UserAccount = Depends(get_current_user)):
+    neg = session.get(Negotiation, negotiation_id)
+    if not neg:
+        raise HTTPException(status_code=404, detail="Negotiation not found.")
+    _require_participant(neg, current_user)
+    invoice = session.exec(select(Invoice).where(Invoice.negotiation_id == negotiation_id)).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="No invoice exists for this negotiation yet.")
+    line_items = session.exec(select(InvoiceLineItem).where(InvoiceLineItem.invoice_id == invoice.id)).all()
+    return {"invoice": invoice, "line_items": line_items}
+
+@app.get("/api/billing/history")
+def get_billing_history(current_user: UserAccount = Depends(get_current_user), session: Session = Depends(get_session)):
+    invoices = session.exec(
+        select(Invoice).where(
+            (Invoice.sponsor_email == current_user.email) | (Invoice.influencer_email == current_user.email)
+        ).order_by(Invoice.issued_at.desc())
+    ).all()
+    return invoices
+
+
 # --- SUPPORT TICKET ENDPOINTS ---
 @app.post("/api/support/tickets")
 def create_support_ticket(payload: SupportTicketCreate, background_tasks: BackgroundTasks, session: Session = Depends(get_session), current_user: UserAccount = Depends(get_current_user)):
@@ -1759,9 +2568,10 @@ def get_my_support_tickets(current_user: UserAccount = Depends(get_current_user)
 import secrets as _secrets_module
 _admin_otp_store = {}  # single-slot: {"code": str, "expires_at": datetime, "attempts": int}
 _admin_sessions = {}  # {token: expires_at}
-_admin_lockout = {"locked_until": None}  # global (not per-IP) hard lockout after too many wrong OTPs
+_admin_lockout = {"locked_until": None}  # global (not per-IP) hard lockout after too many wrong secrets/OTPs
+_admin_secret_attempts = {"count": 0}  # wrong-SECRET attempts, feeds the same global lockout as wrong-OTP attempts
 ADMIN_SESSION_HOURS = 4
-ADMIN_OTP_MAX_ATTEMPTS = 3      # 3 wrong codes on a single OTP -> hard lockout
+ADMIN_OTP_MAX_ATTEMPTS = 3      # 3 wrong secrets, OR 3 wrong codes on a single OTP -> hard lockout
 ADMIN_LOCKOUT_MINUTES = 30      # lockout blocks BOTH requesting a new code and verifying one
 
 class AdminLoginRequest(BaseModel):
@@ -1780,8 +2590,25 @@ def admin_request_2fa(payload: AdminLoginRequest, request: Request, background_t
     _admin_check_lockout(session, client_ip)
 
     if not payload.secret or not hmac.compare_digest(payload.secret, ADMIN_SECRET):
-        log_audit(session, f"ip:{client_ip}", "admin_login_failed", "Incorrect secret")
-        raise HTTPException(status_code=401, detail="Invalid admin credentials.")
+        _admin_secret_attempts["count"] += 1
+        attempts_used = _admin_secret_attempts["count"]
+        log_audit(session, f"ip:{client_ip}", "admin_login_failed", f"Incorrect secret, attempt {attempts_used}/{ADMIN_OTP_MAX_ATTEMPTS}")
+
+        if attempts_used >= ADMIN_OTP_MAX_ATTEMPTS:
+            _admin_secret_attempts["count"] = 0
+            _admin_otp_store.clear()
+            _admin_lockout["locked_until"] = datetime.utcnow() + timedelta(minutes=ADMIN_LOCKOUT_MINUTES)
+            log_audit(session, f"ip:{client_ip}", "admin_lockout_triggered", f"locked {ADMIN_LOCKOUT_MINUTES} min after {ADMIN_OTP_MAX_ATTEMPTS} wrong secrets")
+            raise HTTPException(
+                status_code=423,
+                detail=f"Too many incorrect attempts ({ADMIN_OTP_MAX_ATTEMPTS}/{ADMIN_OTP_MAX_ATTEMPTS}). Admin access is locked for {ADMIN_LOCKOUT_MINUTES} minutes."
+            )
+
+        remaining_attempts = ADMIN_OTP_MAX_ATTEMPTS - attempts_used
+        raise HTTPException(status_code=401, detail=f"Invalid admin credentials. {remaining_attempts} attempt(s) remaining before lockout.")
+
+    # Correct secret -> this step's wrong-attempt counter no longer matters this cycle.
+    _admin_secret_attempts["count"] = 0
 
     if not ADMIN_NOTIFICATION_EMAIL:
         raise HTTPException(status_code=503, detail="2FA requires ADMIN_NOTIFICATION_EMAIL to be set in Railway Variables.")
@@ -1797,9 +2624,11 @@ def admin_request_2fa(payload: AdminLoginRequest, request: Request, background_t
 
 def _admin_check_lockout(session: Session, client_ip: str):
     """Raise 423 if the admin panel is currently in a hard lockout window.
-    The lockout is global (not per-IP) since the admin credentials are a single
-    shared secret -- this closes the loophole of just requesting a fresh OTP
-    (or attacking from a different IP) immediately after burning 3 guesses."""
+    Triggered by 3 wrong secrets (password-equivalent) OR 3 wrong OTP codes --
+    either one alone is enough. The lockout is global (not per-IP) since the
+    admin credentials are a single shared secret -- this closes the loophole
+    of just requesting a fresh OTP (or attacking from a different IP)
+    immediately after burning 3 guesses."""
     locked_until = _admin_lockout.get("locked_until")
     if locked_until and datetime.utcnow() < locked_until:
         remaining_seconds = int((locked_until - datetime.utcnow()).total_seconds())
@@ -2003,6 +2832,15 @@ def admin_get_analytics(session: Session = Depends(get_session), _: bool = Depen
     values_breakdown = _tally(listings, lambda l: l.values_tags)
     budget_distribution = _bucket_budget(listings)
 
+    # --- Account-level data collection breakdowns (Sept 2026 expansion) ---
+    quality_tier_breakdown = _tally(users, lambda u: u.production_quality_tier)
+    communication_style_breakdown = _tally(users, lambda u: u.communication_style)
+    payment_terms_breakdown = _tally(users, lambda u: u.payment_terms_accepted)
+    content_rating_breakdown = _tally(users, lambda u: u.content_rating)
+    audience_gender_breakdown = _tally(users, lambda u: u.audience_gender_lean)
+    agency_managed_count = sum(1 for u in users if u.is_agency_managed)
+    portfolio_filled_count = sum(1 for u in users if u.portfolio_url.strip())
+
     sponsor_listings = [l for l in listings if l.role == "sponsor"]
     influencer_listings = [l for l in listings if l.role == "influencer"]
     brand_safety_conscious = sum(1 for l in sponsor_listings if l.excluded_niches.strip())
@@ -2057,6 +2895,16 @@ def admin_get_analytics(session: Session = Depends(get_session), _: bool = Depen
             "values_tags": values_breakdown,
             "budget_distribution": budget_distribution,
             "reliability": [{"label": k, "count": v} for k, v in reliability_buckets.items()],
+            "production_quality_tier": quality_tier_breakdown,
+            "communication_style": communication_style_breakdown,
+            "payment_terms_accepted": payment_terms_breakdown,
+            "content_rating": content_rating_breakdown,
+            "audience_gender_lean": audience_gender_breakdown,
+        },
+        "account_data_collection": {
+            "agency_managed_accounts": agency_managed_count,
+            "accounts_with_portfolio_url": portfolio_filled_count,
+            "total_accounts": len(users),
         },
         "supply_demand": {
             "sponsor_listings": len(sponsor_listings),
@@ -2125,6 +2973,74 @@ def admin_approve_escrow_release(payment_id: int, session: Session = Depends(get
         return {"status": "success", "message": "Escrow released."}
     except HTTPException as e:
         raise e
+
+@app.get("/api/admin/disputes")
+def admin_list_disputes(session: Session = Depends(get_session), _: bool = Depends(verify_admin)):
+    """Every open dispute, with the negotiation, requirement checklist, and compliance
+    verdict attached so an admin can resolve it by reading data, not by asking either
+    side to re-explain what happened."""
+    disputes = session.exec(select(EscrowDispute).where(EscrowDispute.status == "open")).all()
+    out = []
+    for d in disputes:
+        neg = session.get(Negotiation, d.negotiation_id)
+        payment = session.exec(select(EscrowPayment).where(EscrowPayment.negotiation_id == d.negotiation_id)).first()
+        out.append({
+            "dispute": d,
+            "negotiation": neg,
+            "payment": payment,
+            "compliance": compute_compliance(d.negotiation_id, session),
+        })
+    return out
+
+@app.post("/api/admin/disputes/{dispute_id}/resolve")
+def admin_resolve_dispute(dispute_id: int, payload: DisputeResolve, session: Session = Depends(get_session), _: bool = Depends(verify_admin)):
+    """Three deterministic outcomes, nothing else — this is the final, human-in-the-loop
+    step of the objective condition system: everything up to here was data, this is the
+    one judgment call, made once, by SOCIA, on the record.
+    - release: pays the influencer in full, exactly like a normal compliant release.
+    - refund: returns the sponsor's payment in full via Razorpay.
+    - partial: recorded as the decision, but NOT auto-executed — a partial split of an
+      already-created Razorpay transfer isn't a safe unattended operation (the transfer's
+      on_hold flag is all-or-nothing), so this is flagged for manual settlement in the
+      Razorpay dashboard rather than faking an automated split with real money."""
+    if payload.resolution not in DISPUTE_RESOLUTIONS:
+        raise HTTPException(status_code=400, detail=f"resolution must be one of: {', '.join(sorted(DISPUTE_RESOLUTIONS))}")
+
+    dispute = session.get(EscrowDispute, dispute_id)
+    if not dispute:
+        raise HTTPException(status_code=404, detail="Dispute not found.")
+    if dispute.status != "open":
+        raise HTTPException(status_code=400, detail=f"This dispute is already {dispute.status}.")
+
+    payment = session.exec(select(EscrowPayment).where(EscrowPayment.negotiation_id == dispute.negotiation_id)).first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Escrow payment not found for this negotiation.")
+
+    if payload.resolution == "release":
+        payment.status = "funded"  # restore so release_escrow_if_ready's normal gates run
+        session.add(payment)
+        session.commit()
+        release_razorpay_escrow(payment, session)
+        dispute.status = "resolved_release"
+        msg = f"Dispute resolved by SOCIA: escrow released in full (₹{payment.influencer_payout:,.2f} to the influencer)."
+    elif payload.resolution == "refund":
+        refund_razorpay_escrow(payment, session)
+        dispute.status = "resolved_refund"
+        msg = f"Dispute resolved by SOCIA: full refund issued to the sponsor (₹{payment.amount:,.2f})."
+    else:  # partial
+        payment.status = "disputed"  # left disputed — no funds move automatically
+        session.add(payment)
+        dispute.status = "resolved_partial"
+        msg = f"Dispute resolved by SOCIA as a partial settlement — flagged for manual split via the Razorpay dashboard: {payload.resolution_note.strip() or '(no split details provided)'}"
+
+    dispute.resolution_note = payload.resolution_note.strip()
+    dispute.resolved_by = "admin"
+    dispute.resolved_at = datetime.utcnow()
+    session.add(dispute)
+    session.add(NegotiationMessage(negotiation_id=dispute.negotiation_id, sender_name="System", text=msg))
+    session.commit()
+    log_audit(session, "admin", "escrow_dispute_resolved", f"dispute_id={dispute_id} resolution={payload.resolution}")
+    return {"status": "success", "message": msg}
 
 
 # --- FORGOT PASSWORD (reuses the OTP + Google Workspace SMTP infrastructure) ---
@@ -2262,14 +3178,29 @@ PAYOUT_COOLDOWN_HOURS = 48
 MANUAL_REVIEW_THRESHOLD = float(os.getenv("MANUAL_REVIEW_THRESHOLD", "5000"))  # releases above this $ amount need admin approval
 
 def release_escrow_if_ready(negotiation_id: int, session: Session):
-    """Called automatically when both parties mutually lock a negotiation.
+    """Called automatically when both parties mutually lock a negotiation (and again after
+    a deliverable review is saved, in case that review was the last thing blocking it).
     Transfers funds from the platform balance to the influencer's connected Razorpay account.
-    Includes two safety gates: a cooldown on newly-linked payout accounts (protects
-    against a hijacked account immediately redirecting funds), and a manual review
-    threshold for large amounts."""
+    Includes three safety gates: an objective deliverable-compliance check (only engages if
+    the negotiation actually has requirements defined — deals with none behave exactly as
+    before), a cooldown on newly-linked payout accounts (protects against a hijacked account
+    immediately redirecting funds), and a manual review threshold for large amounts."""
     payment = session.exec(select(EscrowPayment).where(EscrowPayment.negotiation_id == negotiation_id)).first()
     if not payment or payment.status != "funded":
-        return  # Nothing to release — not funded, or already released
+        return  # Nothing to release — not funded, disputed, or already released
+
+    # Gate 0: objective deliverable compliance. A negotiation with zero requirements defined
+    # is untouched by this — mutual lock alone still releases, exactly as before this feature.
+    compliance = compute_compliance(negotiation_id, session)
+    if compliance["has_requirements"] and not compliance["all_required_met"]:
+        unmet = compliance["required_total"] - compliance["required_met"]
+        session.add(NegotiationMessage(
+            negotiation_id=negotiation_id, sender_name="System",
+            text=f"Mutual lock achieved, but {unmet} of {compliance['required_total']} required deliverable condition(s) are not yet confirmed met ({compliance['compliance_percent']}% compliant). Funds remain in escrow until the sponsor completes deliverable review, or a dispute is resolved by SOCIA."
+        ))
+        session.commit()
+        log_audit(session, payment.influencer_email, "escrow_release_held_compliance", f"negotiation_id={negotiation_id} unmet={unmet}/{compliance['required_total']}")
+        return
 
     influencer = session.exec(select(UserAccount).where(UserAccount.email == payment.influencer_email)).first()
     payout_ready = influencer and influencer.razorpay_account_id and influencer.razorpay_account_active
@@ -2485,6 +3416,15 @@ def fund_escrow_razorpay(negotiation_id: int, session: Session = Depends(get_ses
             razorpay_order_id=order["id"],
             status="pending"
         ))
+
+    invoice = session.exec(select(Invoice).where(Invoice.negotiation_id == negotiation_id)).first()
+    if invoice:
+        invoice.gross_amount = neg.amount
+        invoice.platform_fee_percent = get_commission_rate(current_user)
+        invoice.platform_fee_amount = platform_fee
+        invoice.net_payout_amount = influencer_payout
+        session.add(invoice)
+
     session.commit()
     log_audit(session, current_user.email, "razorpay_order_created", f"negotiation_id={negotiation_id} amount={neg.amount}")
 
@@ -2529,6 +3469,11 @@ def verify_razorpay_payment(negotiation_id: int, payload: RazorpayVerifyPayment,
         payment.funded_at = datetime.utcnow()
         payment.razorpay_payment_id = payload.razorpay_payment_id
         session.add(payment)
+        invoice = session.exec(select(Invoice).where(Invoice.negotiation_id == negotiation_id)).first()
+        if invoice:
+            invoice.status = "funded"
+            invoice.funded_at = payment.funded_at
+            session.add(invoice)
         session.add(NegotiationMessage(
             negotiation_id=negotiation_id, sender_name="System",
             text=f"Escrow funded: ₹{payment.amount:,.2f} secured. Funds will release to the influencer upon mutual lock-in."
@@ -2565,6 +3510,11 @@ async def razorpay_webhook(request: Request, session: Session = Depends(get_sess
                 payment.funded_at = datetime.utcnow()
                 payment.razorpay_payment_id = entity.get("id")
                 session.add(payment)
+                invoice = session.exec(select(Invoice).where(Invoice.negotiation_id == payment.negotiation_id)).first()
+                if invoice:
+                    invoice.status = "funded"
+                    invoice.funded_at = payment.funded_at
+                    session.add(invoice)
                 session.add(NegotiationMessage(
                     negotiation_id=payment.negotiation_id, sender_name="System",
                     text=f"Escrow funded (webhook-confirmed): ₹{payment.amount:,.2f} secured."
@@ -2596,6 +3546,39 @@ def release_razorpay_escrow(payment: EscrowPayment, session: Session):
     payment.status = "released"
     payment.released_at = datetime.utcnow()
     session.add(payment)
+
+    invoice = session.exec(select(Invoice).where(Invoice.negotiation_id == payment.negotiation_id)).first()
+    if invoice:
+        invoice.status = "released"
+        invoice.released_at = datetime.utcnow()
+        session.add(invoice)
+
+def refund_razorpay_escrow(payment: EscrowPayment, session: Session):
+    """Full refund of the captured payment back to the sponsor — the counterpart to
+    release_razorpay_escrow, used when an admin resolves a dispute in the sponsor's favor.
+    A held transfer that was never released has nothing to reverse on the influencer's
+    side; refunding the underlying payment is what actually returns the money."""
+    order_details = razorpay_request("GET", f"/orders/{payment.razorpay_order_id}/payments")
+    payments_list = order_details.get("items", [])
+    if not payments_list:
+        raise HTTPException(status_code=400, detail="No captured payment found for this order to refund.")
+    razorpay_payment_id = payments_list[0]["id"]
+
+    razorpay_request("POST", f"/payments/{razorpay_payment_id}/refund", json_body={
+        "amount": int(round(payment.amount * 100)),
+        "speed": "normal",
+        "notes": {"negotiation_id": str(payment.negotiation_id), "reason": "dispute_resolution_refund"},
+    })
+
+    payment.status = "refunded"
+    payment.released_at = datetime.utcnow()
+    session.add(payment)
+
+    invoice = session.exec(select(Invoice).where(Invoice.negotiation_id == payment.negotiation_id)).first()
+    if invoice:
+        invoice.status = "refunded"
+        invoice.refunded_at = datetime.utcnow()
+        session.add(invoice)
 
 
 # ============================================================================
@@ -2733,11 +3716,17 @@ def admin_score_pair(viewer_listing_id: int, candidate_listing_id: int, session:
         raise HTTPException(status_code=404, detail="One or both listings not found.")
 
     reliability_map = get_reliability_signals(session, {viewer.contact, candidate.contact})
-    breakdown = compute_match_breakdown(viewer, candidate, reliability_map.get(candidate.contact))
+    account_map = get_account_map(session, {viewer.contact, candidate.contact})
+    breakdown = compute_match_breakdown(
+        viewer, candidate, reliability_map.get(candidate.contact),
+        account_map.get(viewer.contact), account_map.get(candidate.contact),
+    )
     return {
         "viewer": {"id": viewer.id, "name": viewer.name, "role": viewer.role, "budget": [viewer.budget_min, viewer.budget_max], "audience_or_minimum": viewer.audience_size, "engagement_or_minimum": viewer.engagement_rate, "niches": viewer.niche_tags, "excluded_niches": viewer.excluded_niches, "location": viewer.location, "requires_local_presence": viewer.requires_local_presence, "interests": viewer.interests},
         "candidate": {"id": candidate.id, "name": candidate.name, "role": candidate.role, "budget": [candidate.budget_min, candidate.budget_max], "audience_or_minimum": candidate.audience_size, "engagement_or_minimum": candidate.engagement_rate, "niches": candidate.niche_tags, "location": candidate.location, "interests": candidate.interests, "verified": candidate.verified},
         "candidate_reliability_signal": reliability_map.get(candidate.contact),
+        "viewer_account": account_map.get(viewer.contact),
+        "candidate_account": account_map.get(candidate.contact),
         "breakdown": breakdown,
     }
 
